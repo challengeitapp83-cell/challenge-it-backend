@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
   StyleSheet, ActivityIndicator, Alert, Share, Clipboard, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Video, ResizeMode } from 'expo-av';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { api } from '../../contexts/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SPACING, RADIUS, CATEGORIES, getChallengeImage } from '../../contexts/theme';
+
+const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function ChallengeDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -18,6 +21,7 @@ export default function ChallengeDetailScreen() {
   const { user, refreshUser } = useAuth();
   const [challenge, setChallenge] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [proofs, setProofs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [contributing, setContributing] = useState(false);
@@ -30,12 +34,14 @@ export default function ChallengeDetailScreen() {
 
   const fetchData = async () => {
     try {
-      const [ch, lb] = await Promise.all([
+      const [ch, lb, pr] = await Promise.all([
         api.get(`/api/challenges/${id}`),
         api.get(`/api/challenges/${id}/leaderboard?limit=10`).catch(() => []),
+        api.get(`/api/challenges/${id}/proofs`).catch(() => []),
       ]);
       setChallenge(ch);
       setLeaderboard(lb);
+      setProofs(pr);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -256,6 +262,74 @@ export default function ChallengeDetailScreen() {
           </View>
         )}
 
+        {/* ===== PROOFS GALLERY ===== */}
+        {proofs.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Preuves ({proofs.length})</Text>
+            {proofs.map((p: any) => {
+              const isVideo = p.media_type === 'video';
+              const hasImage = p.image && !p.image.startsWith('/api/media');
+              const hasMediaUrl = p.media_url || (p.image && p.image.startsWith('/api/media'));
+              const mediaSource = hasMediaUrl ? `${API_URL}${p.media_url || p.image}` : null;
+
+              return (
+                <View key={p.proof_id} style={pf.card}>
+                  {/* User info */}
+                  <View style={pf.header}>
+                    {p.user_picture ? (
+                      <Image source={{ uri: p.user_picture }} style={pf.avatar} />
+                    ) : (
+                      <LinearGradient colors={['#007AFF', '#AF52DE']} style={pf.avatar}>
+                        <Text style={pf.avatarI}>{p.user_name?.charAt(0)?.toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={pf.userName}>{p.user_name}</Text>
+                      <Text style={pf.dayTag}>Jour {p.day_number}</Text>
+                    </View>
+                    <View style={[pf.typeBadge, isVideo ? { backgroundColor: '#FF6B3520' } : { backgroundColor: '#007AFF20' }]}>
+                      <Ionicons name={isVideo ? 'videocam' : 'image'} size={12} color={isVideo ? '#FF6B35' : '#007AFF'} />
+                      <Text style={[pf.typeT, { color: isVideo ? '#FF6B35' : '#007AFF' }]}>
+                        {isVideo ? 'Video' : 'Photo'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Media content */}
+                  {isVideo && mediaSource ? (
+                    <View style={pf.mediaW}>
+                      <Video
+                        source={{ uri: mediaSource }}
+                        style={pf.media}
+                        useNativeControls
+                        resizeMode={ResizeMode.COVER}
+                        isLooping={false}
+                        shouldPlay={false}
+                      />
+                    </View>
+                  ) : hasImage ? (
+                    <Image source={{ uri: p.image }} style={pf.media} />
+                  ) : null}
+
+                  {/* Text */}
+                  {p.text ? <Text style={pf.text}>{p.text}</Text> : null}
+
+                  {/* Footer */}
+                  <View style={pf.footer}>
+                    <View style={pf.footerL}>
+                      <Ionicons name="heart" size={14} color={p.likes > 0 ? '#FF2D55' : COLORS.textMuted} />
+                      <Text style={pf.footerT}>{p.likes || 0}</Text>
+                    </View>
+                    <Text style={pf.footerTime}>
+                      {p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Join / Publish / Bet */}
         {!isJoined ? (
           <TouchableOpacity
@@ -418,4 +492,23 @@ const styles = StyleSheet.create({
   inviteCode: { fontSize: 28, fontWeight: '900', color: COLORS.secondary, letterSpacing: 6 },
   shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.primary + '15', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   shareBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+});
+
+// Proof gallery styles
+const pf = StyleSheet.create({
+  card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  avatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  avatarI: { fontSize: 14, fontWeight: '800', color: '#FFF' },
+  userName: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  dayTag: { fontSize: 11, fontWeight: '600', color: COLORS.primary, marginTop: 1 },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  typeT: { fontSize: 11, fontWeight: '700' },
+  mediaW: { borderRadius: 12, overflow: 'hidden', marginBottom: 10 },
+  media: { width: '100%', height: 200, borderRadius: 12 },
+  text: { fontSize: 14, fontWeight: '500', color: COLORS.textSecondary, lineHeight: 20, marginBottom: 8 },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  footerL: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerT: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  footerTime: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
 });

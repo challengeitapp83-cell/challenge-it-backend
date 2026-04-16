@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -121,7 +122,9 @@ class Proof(BaseModel):
     user_picture: Optional[str] = None
     challenge_id: str
     challenge_title: str
-    image: Optional[str] = None  # Base64 encoded
+    image: Optional[str] = None  # Base64 encoded or URL
+    media_url: Optional[str] = None  # URL for uploaded video/image files
+    media_type: str = "text"  # text, image, video
     text: str
     day_number: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -132,6 +135,7 @@ class ProofCreate(BaseModel):
     challenge_id: str
     image: Optional[str] = None
     text: str
+    media_type: str = "text"
 
 class Badge(BaseModel):
     badge_id: str
@@ -906,13 +910,16 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
         raise HTTPException(status_code=400, detail="You've already submitted a proof today for this challenge")
     
     # Create proof
+    media_type = proof_data.media_type or ("image" if proof_data.image else "text")
     proof = Proof(
         user_id=user.user_id,
         user_name=user.name,
         user_picture=user.picture,
         challenge_id=proof_data.challenge_id,
         challenge_title=challenge["title"],
-        image=proof_data.image,
+        image=proof_data.image if media_type == "image" else None,
+        media_url=proof_data.image if media_type == "video" else None,
+        media_type=media_type,
         text=proof_data.text,
         day_number=user_challenge["current_day"]
     )
@@ -958,6 +965,85 @@ async def get_proofs(challenge_id: Optional[str] = None, limit: int = 20):
 async def get_proofs_feed(limit: int = 20):
     """Get global proofs feed"""
     proofs = await db.proofs.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return proofs
+
+# ==================== MEDIA UPLOAD ====================
+
+UPLOAD_DIR = ROOT_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_VIDEO = {".mp4", ".mov", ".webm", ".avi"}
+ALLOWED_IMAGE = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+@api_router.post("/upload-media")
+async def upload_media(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    """Upload a video or image file"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Fichier requis")
+    
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_VIDEO and ext not in ALLOWED_IMAGE:
+        raise HTTPException(status_code=400, detail=f"Format non supporte: {ext}")
+    
+    # Determine media type
+    media_type = "video" if ext in ALLOWED_VIDEO else "image"
+    
+    # Generate unique filename
+    file_id = f"{uuid.uuid4().hex[:16]}{ext}"
+    file_path = UPLOAD_DIR / file_id
+    
+    # Save file with size check
+    total_size = 0
+    with open(file_path, "wb") as f:
+        while True:
+            chunk = await file.read(1024 * 1024)  # 1MB chunks
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > MAX_FILE_SIZE:
+                f.close()
+                file_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 50MB)")
+            f.write(chunk)
+    
+    media_url = f"/api/media/{file_id}"
+    
+    return {
+        "media_url": media_url,
+        "media_type": media_type,
+        "filename": file_id,
+        "size": total_size,
+    }
+
+@api_router.get("/media/{filename}")
+async def serve_media(filename: str):
+    """Serve uploaded media files"""
+    file_path = UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    
+    ext = Path(filename).suffix.lower()
+    content_types = {
+        ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+        ".avi": "video/x-msvideo", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp",
+    }
+    return FileResponse(file_path, media_type=content_types.get(ext, "application/octet-stream"))
+
+# ==================== CHALLENGE PROOFS GALLERY ====================
+
+@api_router.get("/challenges/{challenge_id}/proofs")
+async def get_challenge_proofs(challenge_id: str, user: User = Depends(get_optional_user)):
+    """Get all proofs for a challenge - visible to participants"""
+    challenge = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Defi introuvable")
+    
+    proofs = await db.proofs.find(
+        {"challenge_id": challenge_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
     return proofs
 
 @api_router.post("/proofs/{proof_id}/like")

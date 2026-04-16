@@ -235,7 +235,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Social system implemented. New endpoints: POST /api/friends/request (send friend request), GET /api/friends/requests (pending requests), POST /api/friends/accept/{id}, POST /api/friends/decline/{id}, GET /api/friends/requests/sent, GET /api/notifications, GET /api/notifications/unread-count, POST /api/notifications/read, POST /api/challenges/invite, POST /api/challenges/create-and-invite. Search users now returns friendship status. New frontend screens: /social (search+requests+friends), /notifications, /challenge-friend (quick challenge flow). Test the social flow: search user, send friend request, accept request, invite to challenge."
+    message: "Video proof system implemented. New endpoints: POST /api/upload-media (multipart file upload for video/image, max 50MB), GET /api/media/{filename} (serve uploaded files), GET /api/challenges/{id}/proofs (get all proofs for a challenge - adversary viewing). Updated proof model with media_type and media_url fields. Frontend publish screen rewritten with expo-av video support (camera+gallery, preview, progress bar). Challenge detail now shows proof gallery with video player for adversaries to view proofs. Test: upload-media endpoint, media serving, challenge proofs gallery, updated proof creation with media_type."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE - All addiction engine endpoints PASSED. /api/money-stats (NO AUTH): Returns 18,400 total in play, 6 active pots, biggest pot 11,700. /api/social-pressure (AUTH): Returns 5 personalized messages with correct structure. /api/user-rank (AUTH): Returns rank 10/17 with 5 nearby rivals. /api/daily-triggers (AUTH): Returns personalized triggers. All endpoints handle auth correctly (401 for invalid tokens). Existing endpoints (/api/challenges, /api/leaderboard) working. Challenges include pot data (has_pot, pot_total, pot_amount_per_person). 100% test success rate (12/12 tests passed)."
   - agent: "testing"
@@ -361,6 +361,64 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ PASSED - Returns friends list with correct structure including badges field (user_id, name, picture, level, points, streak, badges). Empty array for test user as expected. Auth required."
+
+  - task: "Media upload endpoint /api/upload-media"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - POST /api/upload-media accepts multipart file uploads with Bearer auth. Supports video (.mp4, .mov, .webm, .avi) and image (.jpg, .jpeg, .png, .gif, .webp) formats. Returns JSON with media_url, media_type, filename, size. Rejects invalid formats (400) and unauthorized requests (401). Max file size 50MB enforced."
+
+  - task: "Media serving endpoint /api/media/{filename}"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/media/{filename} serves uploaded files with correct content-type headers. No auth required. Returns 404 for non-existent files. Successfully serves both video/mp4 and image/jpeg files."
+
+  - task: "Challenge proofs gallery endpoint /api/challenges/{id}/proofs"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/challenges/{challenge_id}/proofs returns array of proof objects. No auth required. Proofs include media_type and media_url fields for video proofs, image field for image proofs. Successfully tested with challenge_sport1."
+
+  - task: "Updated proof creation with media_type"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - POST /api/proofs now supports media_type field (text, image, video). For video proofs, media_url is populated from image field. For image proofs, image field is used. Proof objects correctly include media_type and media_url/image fields. Successfully created both video and image proofs."
+
+agent_communication:
+  - agent: "main"
+    message: "Video proof system implemented. New endpoints: POST /api/upload-media (multipart file upload for video/image, max 50MB), GET /api/media/{filename} (serve uploaded files), GET /api/challenges/{id}/proofs (get all proofs for a challenge - adversary viewing). Updated proof model with media_type and media_url fields. Frontend publish screen rewritten with expo-av video support (camera+gallery, preview, progress bar). Challenge detail now shows proof gallery with video player for adversaries to view proofs. Test: upload-media endpoint, media serving, challenge proofs gallery, updated proof creation with media_type."
+  - agent: "testing"
+    message: "✅ BACKEND TESTING COMPLETE - All addiction engine endpoints PASSED. /api/money-stats (NO AUTH): Returns 18,400 total in play, 6 active pots, biggest pot 11,700. /api/social-pressure (AUTH): Returns 5 personalized messages with correct structure. /api/user-rank (AUTH): Returns rank 10/17 with 5 nearby rivals. /api/daily-triggers (AUTH): Returns personalized triggers. All endpoints handle auth correctly (401 for invalid tokens). Existing endpoints (/api/challenges, /api/leaderboard) working. Challenges include pot data (has_pot, pot_total, pot_amount_per_person). 100% test success rate (12/12 tests passed)."
+  - agent: "testing"
+    message: "✅ SOCIAL SYSTEM TESTING COMPLETE - All social system endpoints PASSED. Fixed critical route ordering issue with /api/users/search (moved before /users/{user_id}). User search returns 2 users matching 'Alex' with correct friendship status. Friend request system working: can send requests, get pending/sent requests. Notifications system working: get notifications, unread count, mark as read. Challenge creation and invitation working with invite codes. Friends list includes badges field. All endpoints require proper auth (401 for invalid tokens). 100% test success rate (16/16 tests passed)."
+  - agent: "testing"
+    message: "✅ VIDEO PROOF SYSTEM TESTING COMPLETE - All video proof endpoints PASSED. POST /api/upload-media: Requires auth, accepts video/image files, rejects invalid formats, returns media_url/type/filename/size. GET /api/media/{filename}: Serves files with correct content-type, no auth needed, 404 for missing files. GET /api/challenges/{id}/proofs: Returns proof arrays with media_type/media_url fields. POST /api/proofs: Updated to support media_type field, correctly handles video/image proofs. Successfully tested full flow: upload → serve → create proof → view in gallery. 100% test success rate (9/9 tests passed)."
 
 #====================================================================================================
 # END - Testing Protocol
