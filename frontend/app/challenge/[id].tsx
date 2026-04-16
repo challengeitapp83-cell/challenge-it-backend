@@ -127,10 +127,161 @@ export default function ChallengeDetailScreen() {
           </View>
           <View style={styles.statItem}>
             <Ionicons name={challenge.is_public ? 'earth' : 'lock-closed'} size={22} color={COLORS.success} />
-            <Text style={styles.statValue}>{challenge.is_public ? 'Public' : 'Privé'}</Text>
-            <Text style={styles.statLabel}>Accès</Text>
+            <Text style={styles.statValue}>{challenge.is_public ? 'Public' : 'Prive'}</Text>
+            <Text style={styles.statLabel}>Acces</Text>
           </View>
         </View>
+
+        {/* ===== PROOFS ACCESS BANNER (ALWAYS VISIBLE) ===== */}
+        <View style={pf.banner}>
+          <TouchableOpacity
+            testID="proofs-banner"
+            activeOpacity={0.85}
+            onPress={() => {
+              if (isJoined) router.push('/(tabs)/publish');
+            }}
+            style={pf.bannerInner}
+          >
+            <LinearGradient
+              colors={proofs.length > 0 ? ['#007AFF12', '#AF52DE08'] : ['#FF6B3512', '#FF3B3008']}
+              style={pf.bannerBg}
+            />
+            <View style={pf.bannerLeft}>
+              <View style={[pf.bannerIcon, proofs.length > 0 ? { backgroundColor: '#007AFF20' } : { backgroundColor: '#FF6B3520' }]}>
+                <Ionicons
+                  name={proofs.length > 0 ? 'images' : 'camera'}
+                  size={24}
+                  color={proofs.length > 0 ? '#007AFF' : '#FF6B35'}
+                />
+              </View>
+              <View>
+                <Text style={pf.bannerTitle}>
+                  {proofs.length > 0 ? `${proofs.length} preuve${proofs.length > 1 ? 's' : ''} envoyee${proofs.length > 1 ? 's' : ''}` : 'Aucune preuve'}
+                </Text>
+                <Text style={pf.bannerSub}>
+                  {proofs.length > 0
+                    ? 'Photos et videos des participants'
+                    : isJoined ? 'Sois le premier a envoyer ta preuve !' : 'Rejoins pour envoyer des preuves'}
+                </Text>
+              </View>
+            </View>
+            {isJoined && (
+              <View style={pf.bannerBtn}>
+                <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* ===== PROOFS GALLERY ===== */}
+        {proofs.length > 0 && (
+          <View style={styles.section}>
+            <View style={pf.galHeader}>
+              <Ionicons name="images" size={20} color={COLORS.primary} />
+              <Text style={styles.sectionTitle}>Preuves des participants</Text>
+            </View>
+            <Text style={pf.galSub}>Visible par tous les participants du defi</Text>
+
+            {proofs.map((p: any) => {
+              const isVideo = p.media_type === 'video';
+              const hasImage = p.image && !p.image.startsWith('/api/media');
+              const hasMediaUrl = p.media_url || (p.image && p.image.startsWith('/api/media'));
+              const mediaSource = hasMediaUrl ? `${API_URL}${p.media_url || p.image}` : null;
+              const isMe = p.user_id === user?.user_id;
+
+              return (
+                <View key={p.proof_id} style={[pf.card, isMe && pf.cardMe]}>
+                  {/* User info */}
+                  <View style={pf.header}>
+                    {p.user_picture ? (
+                      <Image source={{ uri: p.user_picture }} style={pf.avatar} />
+                    ) : (
+                      <LinearGradient colors={['#007AFF', '#AF52DE']} style={pf.avatar}>
+                        <Text style={pf.avatarI}>{p.user_name?.charAt(0)?.toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={pf.userName}>{p.user_name}</Text>
+                        {isMe && (
+                          <View style={pf.meBadge}><Text style={pf.meT}>Toi</Text></View>
+                        )}
+                      </View>
+                      <Text style={pf.dayTag}>Jour {p.day_number}</Text>
+                    </View>
+                    <View style={[pf.typeBadge, isVideo ? { backgroundColor: '#FF6B3520' } : { backgroundColor: '#007AFF20' }]}>
+                      <Ionicons name={isVideo ? 'videocam' : 'image'} size={14} color={isVideo ? '#FF6B35' : '#007AFF'} />
+                      <Text style={[pf.typeT, { color: isVideo ? '#FF6B35' : '#007AFF' }]}>
+                        {isVideo ? 'Video' : 'Photo'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Media content - BIGGER and more prominent */}
+                  {isVideo && mediaSource ? (
+                    <View style={pf.mediaW}>
+                      <Video
+                        source={{ uri: mediaSource }}
+                        style={pf.mediaLarge}
+                        useNativeControls
+                        resizeMode={ResizeMode.COVER}
+                        isLooping={false}
+                        shouldPlay={false}
+                      />
+                      <View style={pf.playOverlay}>
+                        <View style={pf.playBtn}>
+                          <Ionicons name="play" size={24} color="#FFF" />
+                        </View>
+                      </View>
+                    </View>
+                  ) : hasImage ? (
+                    <Image source={{ uri: p.image }} style={pf.mediaLarge} />
+                  ) : null}
+
+                  {/* Text */}
+                  {p.text ? <Text style={pf.text}>{p.text}</Text> : null}
+
+                  {/* Footer */}
+                  <View style={pf.footer}>
+                    <View style={pf.footerL}>
+                      <Ionicons name="heart" size={14} color={p.likes > 0 ? '#FF2D55' : COLORS.textMuted} />
+                      <Text style={pf.footerT}>{p.likes || 0}</Text>
+                    </View>
+                    <View style={pf.footerL}>
+                      <Ionicons name="eye" size={14} color={COLORS.textMuted} />
+                      <Text style={pf.footerT}>Visible par les participants</Text>
+                    </View>
+                    <Text style={pf.footerTime}>
+                      {p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Publish proof CTA (for joined users) */}
+        {isJoined && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              testID="publish-proof-cta"
+              onPress={() => router.push('/(tabs)/publish')}
+              activeOpacity={0.85}
+              style={pf.publishCta}
+            >
+              <LinearGradient
+                colors={['#007AFF', '#AF52DE']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={pf.publishCtaInner}
+              >
+                <Ionicons name="camera" size={22} color="#FFF" />
+                <Text style={pf.publishCtaT}>Envoyer ma preuve</Text>
+                <Text style={pf.publishCtaSub}>Photo ou video</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Leaderboard */}
         {leaderboard.length > 0 && (
@@ -251,7 +402,7 @@ export default function ChallengeDetailScreen() {
                 <Text style={styles.inviteCode}>{challenge.invite_code}</Text>
                 <TouchableOpacity testID="share-invite-btn" onPress={async () => {
                   try {
-                    await Share.share({ message: `Rejoins mon défi "${challenge.title}" sur Challenge It !\n\nCode : ${challenge.invite_code}` });
+                    await Share.share({ message: `Rejoins mon defi "${challenge.title}" sur Challenge It !\n\nCode : ${challenge.invite_code}` });
                   } catch {}
                 }} style={styles.shareBtn}>
                   <Ionicons name="share-social" size={20} color={COLORS.primary} />
@@ -259,74 +410,6 @@ export default function ChallengeDetailScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        )}
-
-        {/* ===== PROOFS GALLERY ===== */}
-        {proofs.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Preuves ({proofs.length})</Text>
-            {proofs.map((p: any) => {
-              const isVideo = p.media_type === 'video';
-              const hasImage = p.image && !p.image.startsWith('/api/media');
-              const hasMediaUrl = p.media_url || (p.image && p.image.startsWith('/api/media'));
-              const mediaSource = hasMediaUrl ? `${API_URL}${p.media_url || p.image}` : null;
-
-              return (
-                <View key={p.proof_id} style={pf.card}>
-                  {/* User info */}
-                  <View style={pf.header}>
-                    {p.user_picture ? (
-                      <Image source={{ uri: p.user_picture }} style={pf.avatar} />
-                    ) : (
-                      <LinearGradient colors={['#007AFF', '#AF52DE']} style={pf.avatar}>
-                        <Text style={pf.avatarI}>{p.user_name?.charAt(0)?.toUpperCase()}</Text>
-                      </LinearGradient>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={pf.userName}>{p.user_name}</Text>
-                      <Text style={pf.dayTag}>Jour {p.day_number}</Text>
-                    </View>
-                    <View style={[pf.typeBadge, isVideo ? { backgroundColor: '#FF6B3520' } : { backgroundColor: '#007AFF20' }]}>
-                      <Ionicons name={isVideo ? 'videocam' : 'image'} size={12} color={isVideo ? '#FF6B35' : '#007AFF'} />
-                      <Text style={[pf.typeT, { color: isVideo ? '#FF6B35' : '#007AFF' }]}>
-                        {isVideo ? 'Video' : 'Photo'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Media content */}
-                  {isVideo && mediaSource ? (
-                    <View style={pf.mediaW}>
-                      <Video
-                        source={{ uri: mediaSource }}
-                        style={pf.media}
-                        useNativeControls
-                        resizeMode={ResizeMode.COVER}
-                        isLooping={false}
-                        shouldPlay={false}
-                      />
-                    </View>
-                  ) : hasImage ? (
-                    <Image source={{ uri: p.image }} style={pf.media} />
-                  ) : null}
-
-                  {/* Text */}
-                  {p.text ? <Text style={pf.text}>{p.text}</Text> : null}
-
-                  {/* Footer */}
-                  <View style={pf.footer}>
-                    <View style={pf.footerL}>
-                      <Ionicons name="heart" size={14} color={p.likes > 0 ? '#FF2D55' : COLORS.textMuted} />
-                      <Text style={pf.footerT}>{p.likes || 0}</Text>
-                    </View>
-                    <Text style={pf.footerTime}>
-                      {p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
           </View>
         )}
 
@@ -496,19 +579,44 @@ const styles = StyleSheet.create({
 
 // Proof gallery styles
 const pf = StyleSheet.create({
-  card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  avatarI: { fontSize: 14, fontWeight: '800', color: '#FFF' },
-  userName: { fontSize: 14, fontWeight: '700', color: '#FFF' },
-  dayTag: { fontSize: 11, fontWeight: '600', color: COLORS.primary, marginTop: 1 },
-  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  typeT: { fontSize: 11, fontWeight: '700' },
-  mediaW: { borderRadius: 12, overflow: 'hidden', marginBottom: 10 },
-  media: { width: '100%', height: 200, borderRadius: 12 },
-  text: { fontSize: 14, fontWeight: '500', color: COLORS.textSecondary, lineHeight: 20, marginBottom: 8 },
+  // Banner (always visible right after stats)
+  banner: { paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  bannerInner: { borderRadius: 18, overflow: 'hidden', position: 'relative' },
+  bannerBg: { ...StyleSheet.absoluteFillObject },
+  bannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, flex: 1 },
+  bannerIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  bannerTitle: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  bannerSub: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.45)', marginTop: 3 },
+  bannerBtn: { position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center' },
+  // Gallery header
+  galHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  galSub: { fontSize: 12, fontWeight: '500', color: COLORS.textMuted, marginBottom: 14, paddingHorizontal: SPACING.md },
+  // Proof card
+  card: { backgroundColor: COLORS.card, borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: COLORS.border },
+  cardMe: { borderColor: COLORS.primary + '30', backgroundColor: COLORS.primary + '06' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  avatarI: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  userName: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  dayTag: { fontSize: 12, fontWeight: '600', color: COLORS.primary, marginTop: 2 },
+  meBadge: { backgroundColor: COLORS.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  meT: { fontSize: 10, fontWeight: '800', color: COLORS.primary },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  typeT: { fontSize: 12, fontWeight: '700' },
+  // Media
+  mediaW: { borderRadius: 14, overflow: 'hidden', marginBottom: 12, position: 'relative' },
+  media: { width: '100%', height: 200, borderRadius: 14 },
+  mediaLarge: { width: '100%', height: 260, borderRadius: 14 },
+  playOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  playBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  text: { fontSize: 15, fontWeight: '500', color: COLORS.textSecondary, lineHeight: 22, marginBottom: 10 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   footerL: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  footerT: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  footerT: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted },
   footerTime: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
+  // Publish CTA
+  publishCta: { borderRadius: 18, overflow: 'hidden', marginHorizontal: SPACING.md },
+  publishCtaInner: { alignItems: 'center', paddingVertical: 20, gap: 6 },
+  publishCtaT: { fontSize: 17, fontWeight: '800', color: '#FFF' },
+  publishCtaSub: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.55)' },
 });
