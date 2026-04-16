@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '../../contexts/api';
-import { COLORS, SPACING, RADIUS, CATEGORIES } from '../../contexts/theme';
+import { COLORS, SPACING, RADIUS, CATEGORIES, getChallengeImage } from '../../contexts/theme';
 
 const CATEGORY_TABS = ['Tous', 'Sport', 'Santé', 'Habitudes', 'Business', 'Autre'];
 
@@ -44,7 +45,6 @@ export default function ChallengesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Défis</Text>
         <TouchableOpacity
@@ -56,27 +56,28 @@ export default function ChallengesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Category Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
       >
-        {CATEGORY_TABS.map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            testID={`filter-${cat}`}
-            onPress={() => setActiveTab(cat)}
-            style={[styles.filterTab, activeTab === cat && styles.filterTabActive]}
-          >
-            <Text style={[styles.filterText, activeTab === cat && styles.filterTextActive]}>
-              {cat}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {CATEGORY_TABS.map((cat) => {
+          const catConfig = CATEGORIES[cat] || {};
+          return (
+            <TouchableOpacity
+              key={cat}
+              testID={`filter-${cat}`}
+              onPress={() => setActiveTab(cat)}
+              style={[styles.filterTab, activeTab === cat && styles.filterTabActive]}
+            >
+              <Text style={[styles.filterText, activeTab === cat && styles.filterTextActive]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* Challenge List */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120, paddingTop: SPACING.md }}
@@ -94,35 +95,44 @@ export default function ChallengesScreen() {
         ) : (
           challenges.map((ch: any) => {
             const catConfig = CATEGORIES[ch.category] || CATEGORIES['Autre'];
+            const imageUrl = getChallengeImage(ch.challenge_id, ch.category, ch.image);
             return (
               <TouchableOpacity
                 key={ch.challenge_id}
                 testID={`challenge-card-${ch.challenge_id}`}
                 onPress={() => router.push(`/challenge/${ch.challenge_id}`)}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 style={styles.card}
               >
-                <View style={styles.cardHeader}>
-                  <View style={[styles.catIcon, { backgroundColor: catConfig.color + '20' }]}>
-                    <Ionicons name={catConfig.icon as any} size={22} color={catConfig.color} />
-                  </View>
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle}>{ch.title}</Text>
-                    <View style={styles.cardMeta}>
-                      <View style={[styles.catBadge, { backgroundColor: catConfig.color + '15' }]}>
-                        <Text style={[styles.catText, { color: catConfig.color }]}>{ch.category}</Text>
-                      </View>
-                      <Text style={styles.duration}>{ch.duration_days}j</Text>
+                <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+                <LinearGradient
+                  colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
+                  locations={[0.2, 1]}
+                  style={styles.cardOverlay}
+                />
+                <View style={styles.cardContent}>
+                  <View style={styles.cardTop}>
+                    <View style={[styles.catBadge, { backgroundColor: catConfig.color + '35' }]}>
+                      <Ionicons name={catConfig.icon as any} size={12} color={catConfig.color} />
+                      <Text style={[styles.catText, { color: catConfig.color }]}>{ch.category}</Text>
+                    </View>
+                    <View style={styles.durationBadge}>
+                      <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.durationText}>{ch.duration_days}j</Text>
                     </View>
                   </View>
-                </View>
-                <Text style={styles.cardDesc} numberOfLines={2}>{ch.description}</Text>
-                <View style={styles.cardFooter}>
-                  <View style={styles.footerItem}>
-                    <Ionicons name="people" size={16} color={COLORS.textMuted} />
-                    <Text style={styles.footerText}>{ch.participant_count} participants</Text>
+                  <Text style={styles.cardTitle}>{ch.title}</Text>
+                  <Text style={styles.cardDesc} numberOfLines={1}>{ch.description}</Text>
+                  <View style={styles.cardFooter}>
+                    <View style={styles.footerItem}>
+                      <Ionicons name="people" size={14} color="rgba(255,255,255,0.6)" />
+                      <Text style={styles.footerText}>{ch.participant_count} participants</Text>
+                    </View>
+                    <View style={styles.joinHint}>
+                      <Text style={styles.joinHintText}>Rejoindre</Text>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </View>
               </TouchableOpacity>
             );
@@ -153,29 +163,36 @@ const styles = StyleSheet.create({
   filterTabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   filterText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
   filterTextActive: { color: '#FFFFFF' },
+  // ===== IMMERSIVE CARD =====
   card: {
-    backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: SPACING.md,
-    marginHorizontal: SPACING.lg, marginBottom: SPACING.sm,
-    borderWidth: 1, borderColor: COLORS.border,
+    marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
+    borderRadius: RADIUS.md, overflow: 'hidden', height: 180,
+    backgroundColor: COLORS.card,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm },
-  catIcon: {
-    width: 48, height: 48, borderRadius: RADIUS.sm,
-    justifyContent: 'center', alignItems: 'center',
+  cardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  cardOverlay: { ...StyleSheet.absoluteFillObject },
+  cardContent: {
+    ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: SPACING.md,
   },
-  cardInfo: { flex: 1, gap: SPACING.xs },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  catBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: RADIUS.sm },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  catBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.sm,
+  },
   catText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  duration: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
-  cardDesc: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.sm },
-  cardFooter: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border,
+  durationBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: SPACING.sm,
+    paddingVertical: 4, borderRadius: RADIUS.sm,
   },
-  footerItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  footerText: { fontSize: 13, fontWeight: '500', color: COLORS.textMuted },
+  durationText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
+  cardTitle: { fontSize: 20, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 18 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerText: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.6)' },
+  joinHint: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  joinHintText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
   empty: { alignItems: 'center', paddingTop: 60, gap: SPACING.md },
   emptyText: { fontSize: 16, fontWeight: '600', color: COLORS.textMuted },
 });

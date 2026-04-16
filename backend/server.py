@@ -626,7 +626,7 @@ async def seed_data():
         {
             "challenge_id": "challenge_sport1",
             "title": "30 Jours de Course",
-            "description": "Courez au moins 2km chaque jour pendant 30 jours",
+            "description": "Courez au moins 2km chaque jour pendant 30 jours. Repoussez vos limites et construisez une habitude de champion.",
             "category": "Sport",
             "duration_days": 30,
             "is_public": True,
@@ -634,12 +634,13 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 156,
+            "image": "https://images.unsplash.com/photo-1758521959972-83d0bd10a152?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
             "challenge_id": "challenge_sante1",
             "title": "Méditation Matinale",
-            "description": "10 minutes de méditation chaque matin",
+            "description": "10 minutes de méditation chaque matin. Trouvez la paix intérieure et la clarté mentale.",
             "category": "Santé",
             "duration_days": 21,
             "is_public": True,
@@ -647,12 +648,13 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 89,
+            "image": "https://images.unsplash.com/photo-1759951611066-d208d302e886?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
             "challenge_id": "challenge_habitudes1",
             "title": "Réveil 5h du Matin",
-            "description": "Se lever à 5h chaque jour pendant 30 jours",
+            "description": "Se lever à 5h chaque jour pendant 30 jours. Devenez une machine de discipline et de productivité.",
             "category": "Habitudes",
             "duration_days": 30,
             "is_public": True,
@@ -660,12 +662,13 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 234,
+            "image": "https://images.unsplash.com/photo-1774185644417-b32c25456aae?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
             "challenge_id": "challenge_business1",
             "title": "Créer du Contenu",
-            "description": "Publier un post LinkedIn chaque jour",
+            "description": "Publier un post LinkedIn chaque jour. Bâtissez votre marque personnelle et votre réseau.",
             "category": "Business",
             "duration_days": 30,
             "is_public": True,
@@ -673,12 +676,13 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 67,
+            "image": "https://images.unsplash.com/photo-1672094272561-3d4e3685a3fa?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
             "challenge_id": "challenge_sport2",
             "title": "100 Pompes par Jour",
-            "description": "Faire 100 pompes chaque jour pendant 30 jours",
+            "description": "Faire 100 pompes chaque jour pendant 30 jours. Transformez votre corps et votre mental.",
             "category": "Sport",
             "duration_days": 30,
             "is_public": True,
@@ -686,6 +690,7 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 178,
+            "image": "https://images.unsplash.com/photo-1648235692910-947cb90ddd97?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         }
     ]
