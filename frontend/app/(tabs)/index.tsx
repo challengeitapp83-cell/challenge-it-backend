@@ -12,6 +12,7 @@ import { api } from '../../contexts/api';
 import { COLORS, CATEGORIES, BADGE_CONFIG, getChallengeImage } from '../../contexts/theme';
 
 const { width: W } = Dimensions.get('window');
+const HERO_BG = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&h=1200&fit=crop&q=75';
 
 const MOTTOS = [
   "Prouve que tu peux tenir.",
@@ -100,6 +101,14 @@ export default function HomeScreen() {
 
   return (
     <View style={g.root}>
+      {/* Immersive Background */}
+      <Animated.Image source={{ uri: HERO_BG }} style={g.bgImg} blurRadius={2} />
+      <LinearGradient
+        colors={['rgba(0,40,160,0.2)', 'rgba(80,20,140,0.3)', 'rgba(12,12,24,0.88)', '#0C0C18']}
+        locations={[0, 0.18, 0.42, 0.58]}
+        style={g.bgOverlay}
+      />
+
       <ScrollView
         testID="home-scroll"
         showsVerticalScrollIndicator={false}
@@ -659,6 +668,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
   load: { flex: 1, backgroundColor: '#0C0C18', justifyContent: 'center', alignItems: 'center' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 520, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 520 },
 });
 
 const hero = StyleSheet.create({

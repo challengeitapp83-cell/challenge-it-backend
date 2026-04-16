@@ -11,7 +11,8 @@ import { useRouter } from 'expo-router';
 import { api } from '../../contexts/api';
 import { COLORS, SPACING, RADIUS, CATEGORIES, getChallengeImage } from '../../contexts/theme';
 
-const CATEGORY_TABS = ['Tous', 'Sport', 'Santé', 'Habitudes', 'Business', 'Autre'];
+const CATEGORY_TABS = ['Tous', 'Sport', 'Sante', 'Habitudes', 'Business', 'Esport', 'Art'];
+const CHALLENGES_BG = 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=900&h=1200&fit=crop&q=75';
 
 export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
@@ -122,7 +123,15 @@ export default function ChallengesScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container]}>
+      {/* Immersive Background */}
+      <Image source={{ uri: CHALLENGES_BG }} style={styles.bgImg} blurRadius={3} />
+      <LinearGradient
+        colors={['rgba(0,50,180,0.15)', 'rgba(255,100,0,0.1)', 'rgba(15,15,15,0.9)', COLORS.background]}
+        locations={[0, 0.15, 0.4, 0.55]}
+        style={styles.bgOverlay}
+      />
+      <View style={{ paddingTop: insets.top }}>
       <View style={styles.header}>
         <Text style={styles.title}>Défis</Text>
         <TouchableOpacity testID="create-challenge-btn" onPress={() => router.push('/create-challenge')} style={styles.createBtn}>
@@ -197,12 +206,15 @@ export default function ChallengesScreen() {
           displayList.map(renderCard)
         )}
       </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
   title: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
   createBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },

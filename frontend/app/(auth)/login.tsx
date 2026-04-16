@@ -13,7 +13,7 @@ import { api } from '../../contexts/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 const { width: W, height: H } = Dimensions.get('window');
-const BG_IMG = 'https://images.unsplash.com/photo-1618517048289-4646902edaf5?w=900&h=1600&fit=crop&q=80';
+const BG_IMG = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&h=1600&fit=crop&q=80';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);

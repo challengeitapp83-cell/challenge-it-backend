@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SPACING, RADIUS, CATEGORIES } from '../../contexts/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const PUBLISH_BG = 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=900&h=1200&fit=crop&q=75';
 
 export default function PublishScreen() {
   const insets = useSafeAreaInsets();
@@ -187,10 +188,19 @@ export default function PublishScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[g.container, { paddingTop: insets.top }]}>
+      <View style={[g.container]}>
+        {/* Immersive Background */}
+        <Image source={{ uri: PUBLISH_BG }} style={g.bgImg} blurRadius={3} />
+        <LinearGradient
+          colors={['rgba(0,80,200,0.15)', 'rgba(120,0,200,0.12)', 'rgba(15,15,15,0.92)', COLORS.background]}
+          locations={[0, 0.12, 0.38, 0.52]}
+          style={g.bgOverlay}
+        />
+        <View style={{ paddingTop: insets.top }}>
         <View style={g.header}>
           <Text style={g.title}>Publier une preuve</Text>
           <Text style={g.sub}>Photo ou video - 30s max</Text>
+        </View>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -327,6 +337,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
   header: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xs },
   title: { fontSize: 26, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
   sub: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginTop: 4 },

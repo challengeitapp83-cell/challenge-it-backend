@@ -10,6 +10,8 @@ import { useRouter } from 'expo-router';
 import { api } from '../contexts/api';
 import { COLORS } from '../contexts/theme';
 
+const NOTIF_BG = 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=900&h=1200&fit=crop&q=75';
+
 const ICONS: Record<string, { icon: string; color: string }> = {
   friend_request: { icon: 'person-add', color: '#007AFF' },
   friend_accepted: { icon: 'people', color: '#34C759' },
@@ -56,6 +58,13 @@ export default function NotificationsScreen() {
 
   return (
     <View style={[g.root, { paddingTop: insets.top }]}>
+      {/* Immersive Background */}
+      <Image source={{ uri: NOTIF_BG }} style={g.bgImg} blurRadius={5} />
+      <LinearGradient
+        colors={['rgba(100,0,200,0.12)', 'rgba(0,30,100,0.15)', 'rgba(12,12,24,0.92)', '#0C0C18']}
+        locations={[0, 0.1, 0.35, 0.5]}
+        style={g.bgOverlay}
+      />
       <View style={g.header}>
         <TouchableOpacity testID="notif-back" onPress={() => router.back()} style={g.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#FFF" />
@@ -106,6 +115,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' } as any,
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   backBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontSize: 24, fontWeight: '900', color: '#FFF' },

@@ -12,6 +12,7 @@ import { COLORS, CATEGORIES } from '../contexts/theme';
 
 const CATS = ['Sport', 'Esport', 'Business', 'Art', 'Sante', 'Nourriture', 'Motivation', 'General'];
 const DURATIONS = [3, 7, 14, 30];
+const CHALLENGE_BG = 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=900&h=1200&fit=crop&q=75';
 const STAKES = [
   { id: 'none', label: 'Rien', icon: 'heart', color: COLORS.textMuted },
   { id: 'gage', label: 'Gage', icon: 'skull', color: '#FF6B35' },
@@ -69,6 +70,13 @@ export default function ChallengeFriendScreen() {
 
   return (
     <View style={[g.root, { paddingTop: insets.top }]}>
+      {/* Immersive Background */}
+      <Image source={{ uri: CHALLENGE_BG }} style={g.bgImg} blurRadius={3} />
+      <LinearGradient
+        colors={['rgba(0,80,200,0.18)', 'rgba(200,80,0,0.1)', 'rgba(12,12,24,0.92)', '#0C0C18']}
+        locations={[0, 0.12, 0.36, 0.5]}
+        style={g.bgOverlay}
+      />
       <View style={g.header}>
         <TouchableOpacity testID="cf-back" onPress={() => router.back()} style={g.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#FFF" />
@@ -211,6 +219,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' } as any,
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   backBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   headerT: { fontSize: 22, fontWeight: '900', color: '#FFF' },

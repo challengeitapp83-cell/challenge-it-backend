@@ -12,6 +12,7 @@ import { api } from '../contexts/api';
 import { COLORS, BADGE_CONFIG } from '../contexts/theme';
 
 type Tab = 'search' | 'requests' | 'friends';
+const SOCIAL_BG = 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&h=1200&fit=crop&q=75';
 
 function Avatar({ u, size }: { u: any; size: number }) {
   if (u?.picture) return <Image source={{ uri: u.picture }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
@@ -120,6 +121,14 @@ export default function SocialScreen() {
 
   return (
     <KeyboardAvoidingView style={g.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* Immersive Background */}
+      <Image source={{ uri: SOCIAL_BG }} style={g.bgImg} blurRadius={4} />
+      <LinearGradient
+        colors={['rgba(175,82,222,0.15)', 'rgba(0,30,100,0.2)', 'rgba(12,12,24,0.9)', '#0C0C18']}
+        locations={[0, 0.12, 0.38, 0.52]}
+        style={g.bgOverlay}
+      />
+
       <View style={[g.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity testID="social-back" onPress={() => router.back()} style={g.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#FFF" />
@@ -363,6 +372,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 420, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 420 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
   backBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontSize: 24, fontWeight: '900', color: '#FFF' },

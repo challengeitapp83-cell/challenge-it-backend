@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView,
-  Animated, Dimensions, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  Animated, Dimensions, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import { api } from '../contexts/api';
 import { COLORS } from '../contexts/theme';
 
 const { width: W } = Dimensions.get('window');
+const CREATE_BG = 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=900&h=1200&fit=crop&q=75';
 
 // ===== DATA =====
 const TYPES = [
@@ -126,7 +127,15 @@ export default function CreateChallengeScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[g.root, { paddingTop: insets.top }]}>
+      <View style={[g.root]}>
+        {/* Immersive Background */}
+        <Image source={{ uri: CREATE_BG }} style={g.bgImg} blurRadius={4} />
+        <LinearGradient
+          colors={['rgba(20,0,80,0.2)', 'rgba(0,40,100,0.15)', 'rgba(12,12,24,0.92)', '#0C0C18']}
+          locations={[0, 0.12, 0.36, 0.5]}
+          style={g.bgOverlay}
+        />
+        <View style={{ paddingTop: insets.top }}>
 
         {/* ===== HEADER ===== */}
         <View style={g.hdr}>
@@ -140,6 +149,7 @@ export default function CreateChallengeScreen() {
               </Animated.View>
             </View>
             <Text style={g.stepN}>{step + 1}/4</Text>
+          </View>
           </View>
         </View>
 
@@ -387,6 +397,8 @@ const GL = { backgroundColor: 'rgba(22,22,38,0.55)', borderWidth: 1, borderColor
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' } as any,
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
   hdr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 14 },
   hdrBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   progW: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
