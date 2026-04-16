@@ -322,7 +322,10 @@ async def get_leaderboard(limit: int = 10):
             "picture": u.get("picture"),
             "level": u.get("level", 1),
             "points": u.get("points", 0),
-            "streak": u.get("streak", 0)
+            "streak": u.get("streak", 0),
+            "badges": u.get("badges", []),
+            "challenges_won": u.get("challenges_won", 0),
+            "total_earnings": u.get("total_earnings", 0),
         }
         for u in users
     ]
@@ -850,14 +853,14 @@ async def seed_data():
     """Seed initial data for demo purposes"""
     # Create sample users for leaderboard
     sample_users = [
-        {"user_id": "seed_user_1", "email": "alex@demo.com", "name": "Alex Martin", "level": 8, "points": 780, "streak": 23, "reputation": 120, "badges": ["first_challenge", "streak_7", "streak_30", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_2", "email": "sarah@demo.com", "name": "Sarah Dubois", "level": 6, "points": 580, "streak": 15, "reputation": 89, "badges": ["first_challenge", "streak_7", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_3", "email": "thomas@demo.com", "name": "Thomas Leroy", "level": 5, "points": 450, "streak": 12, "reputation": 67, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_4", "email": "emma@demo.com", "name": "Emma Bernard", "level": 4, "points": 320, "streak": 9, "reputation": 45, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_5", "email": "lucas@demo.com", "name": "Lucas Petit", "level": 3, "points": 210, "streak": 7, "reputation": 32, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_6", "email": "julie@demo.com", "name": "Julie Moreau", "level": 3, "points": 180, "streak": 5, "reputation": 28, "badges": ["first_challenge", "streak_7"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_7", "email": "hugo@demo.com", "name": "Hugo Lambert", "level": 2, "points": 140, "streak": 4, "reputation": 18, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
-        {"user_id": "seed_user_8", "email": "lea@demo.com", "name": "Léa Richard", "level": 2, "points": 95, "streak": 3, "reputation": 12, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_1", "email": "alex@demo.com", "name": "Alex Martin", "picture": "https://images.unsplash.com/photo-1769636929231-3cd7f853d038?w=200&h=200&fit=crop&crop=face&q=80", "level": 8, "points": 780, "streak": 23, "reputation": 120, "badges": ["first_challenge", "streak_7", "streak_30", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 12, "challenges_lost": 3, "total_earnings": 340, "friends": ["seed_user_2", "seed_user_3"], "bio": "No pain, no gain."},
+        {"user_id": "seed_user_2", "email": "sarah@demo.com", "name": "Sarah Dubois", "picture": "https://images.unsplash.com/photo-1665224752136-4dbe2dfc8195?w=200&h=200&fit=crop&crop=face&q=80", "level": 6, "points": 580, "streak": 15, "reputation": 89, "badges": ["first_challenge", "streak_7", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 8, "challenges_lost": 2, "total_earnings": 180, "friends": ["seed_user_1"], "bio": "Discipline is freedom."},
+        {"user_id": "seed_user_3", "email": "thomas@demo.com", "name": "Thomas Leroy", "picture": "https://images.unsplash.com/photo-1767175620484-1ed37931a0d1?w=200&h=200&fit=crop&crop=face&q=80", "level": 5, "points": 450, "streak": 12, "reputation": 67, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 5, "challenges_lost": 4, "total_earnings": 90, "friends": ["seed_user_1"], "bio": ""},
+        {"user_id": "seed_user_4", "email": "emma@demo.com", "name": "Emma Bernard", "picture": "https://images.unsplash.com/photo-1610721193651-e6aca85b45aa?w=200&h=200&fit=crop&crop=face&q=80", "level": 4, "points": 320, "streak": 9, "reputation": 45, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 3, "challenges_lost": 2, "total_earnings": 50, "friends": [], "bio": ""},
+        {"user_id": "seed_user_5", "email": "lucas@demo.com", "name": "Lucas Petit", "picture": "https://images.unsplash.com/photo-1758534063829-a72058381e21?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 210, "streak": 7, "reputation": 32, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 2, "challenges_lost": 3, "total_earnings": 20, "friends": [], "bio": ""},
+        {"user_id": "seed_user_6", "email": "julie@demo.com", "name": "Julie Moreau", "picture": "https://images.unsplash.com/photo-1544334599-eba0d8934b6f?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 180, "streak": 5, "reputation": 28, "badges": ["first_challenge", "streak_7"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 2, "total_earnings": 0, "friends": [], "bio": ""},
+        {"user_id": "seed_user_7", "email": "hugo@demo.com", "name": "Hugo Lambert", "picture": "https://images.unsplash.com/photo-1764545973653-94c40d993495?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 140, "streak": 4, "reputation": 18, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": ""},
+        {"user_id": "seed_user_8", "email": "lea@demo.com", "name": "Léa Richard", "picture": "https://images.unsplash.com/photo-1771072428365-f0f97d0d25b7?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 95, "streak": 3, "reputation": 12, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 0, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": ""},
     ]
     
     for u in sample_users:
