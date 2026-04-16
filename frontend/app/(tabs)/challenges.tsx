@@ -22,69 +22,35 @@ export default function ChallengesScreen() {
 
   const fetchChallenges = useCallback(async () => {
     try {
-      const query = activeTab === 'Tous' ? '' : `?category=${encodeURIComponent(activeTab)}`;
-      const data = await api.get(`/api/challenges${query}`);
-      setChallenges(data);
-    } catch (e) {
-      console.error('Fetch challenges error:', e);
-    } finally {
-      setLoading(false);
-    }
+      const q = activeTab === 'Tous' ? '' : `?category=${encodeURIComponent(activeTab)}`;
+      setChallenges(await api.get(`/api/challenges${q}`));
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }, [activeTab]);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchChallenges();
-  }, [fetchChallenges]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchChallenges();
-    setRefreshing(false);
-  };
+  useEffect(() => { setLoading(true); fetchChallenges(); }, [fetchChallenges]);
+  const onRefresh = async () => { setRefreshing(true); await fetchChallenges(); setRefreshing(false); };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Défis</Text>
-        <TouchableOpacity
-          testID="create-challenge-btn"
-          onPress={() => router.push('/create-challenge')}
-          style={styles.createBtn}
-        >
+        <TouchableOpacity testID="create-challenge-btn" onPress={() => router.push('/create-challenge')} style={styles.createBtn}>
           <Ionicons name="add" size={24} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabScroll}
-      >
-        {CATEGORY_TABS.map((cat) => {
-          const catConfig = CATEGORIES[cat] || {};
-          return (
-            <TouchableOpacity
-              key={cat}
-              testID={`filter-${cat}`}
-              onPress={() => setActiveTab(cat)}
-              style={[styles.filterTab, activeTab === cat && styles.filterTabActive]}
-            >
-              <Text style={[styles.filterText, activeTab === cat && styles.filterTextActive]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+        {CATEGORY_TABS.map((cat) => (
+          <TouchableOpacity key={cat} testID={`filter-${cat}`} onPress={() => setActiveTab(cat)}
+            style={[styles.filterTab, activeTab === cat && styles.filterTabActive]}>
+            <Text style={[styles.filterText, activeTab === cat && styles.filterTextActive]}>{cat}</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120, paddingTop: SPACING.md }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
-        }
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingTop: 14 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
         ) : challenges.length === 0 ? (
@@ -94,43 +60,38 @@ export default function ChallengesScreen() {
           </View>
         ) : (
           challenges.map((ch: any) => {
-            const catConfig = CATEGORIES[ch.category] || CATEGORIES['Autre'];
-            const imageUrl = getChallengeImage(ch.challenge_id, ch.category, ch.image);
+            const cat = CATEGORIES[ch.category] || CATEGORIES['Autre'];
+            const img = getChallengeImage(ch.challenge_id, ch.category, ch.image);
             return (
-              <TouchableOpacity
-                key={ch.challenge_id}
-                testID={`challenge-card-${ch.challenge_id}`}
-                onPress={() => router.push(`/challenge/${ch.challenge_id}`)}
-                activeOpacity={0.85}
-                style={styles.card}
-              >
-                <Image source={{ uri: imageUrl }} style={styles.cardImage} />
-                <LinearGradient
-                  colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
-                  locations={[0.2, 1]}
-                  style={styles.cardOverlay}
-                />
+              <TouchableOpacity key={ch.challenge_id} testID={`challenge-card-${ch.challenge_id}`}
+                onPress={() => router.push(`/challenge/${ch.challenge_id}`)} activeOpacity={0.85} style={styles.card}>
+                <Image source={{ uri: img }} style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.92)']} locations={[0.15, 1]} style={StyleSheet.absoluteFill} />
                 <View style={styles.cardContent}>
+                  {/* Top row */}
                   <View style={styles.cardTop}>
-                    <View style={[styles.catBadge, { backgroundColor: catConfig.color + '35' }]}>
-                      <Ionicons name={catConfig.icon as any} size={12} color={catConfig.color} />
-                      <Text style={[styles.catText, { color: catConfig.color }]}>{ch.category}</Text>
+                    <View style={[styles.catPill, { backgroundColor: cat.color + '45' }]}>
+                      <Ionicons name={cat.icon as any} size={12} color={cat.color} />
+                      <Text style={[styles.catPillText, { color: cat.color }]}>{ch.category}</Text>
                     </View>
-                    <View style={styles.durationBadge}>
-                      <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.7)" />
-                      <Text style={styles.durationText}>{ch.duration_days}j</Text>
+                    <View style={styles.durPill}>
+                      <Ionicons name="calendar-outline" size={12} color="rgba(255,255,255,0.75)" />
+                      <Text style={styles.durText}>{ch.duration_days}j</Text>
                     </View>
                   </View>
-                  <Text style={styles.cardTitle}>{ch.title}</Text>
-                  <Text style={styles.cardDesc} numberOfLines={1}>{ch.description}</Text>
-                  <View style={styles.cardFooter}>
-                    <View style={styles.footerItem}>
-                      <Ionicons name="people" size={14} color="rgba(255,255,255,0.6)" />
-                      <Text style={styles.footerText}>{ch.participant_count} participants</Text>
-                    </View>
-                    <View style={styles.joinHint}>
-                      <Text style={styles.joinHintText}>Rejoindre</Text>
-                      <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                  {/* Bottom */}
+                  <View>
+                    <Text style={styles.cardTitle}>{ch.title}</Text>
+                    <Text style={styles.cardDesc} numberOfLines={1}>{ch.description}</Text>
+                    <View style={styles.cardFooter}>
+                      <View style={styles.footerLeft}>
+                        <Ionicons name="people" size={14} color="rgba(255,255,255,0.6)" />
+                        <Text style={styles.footerText}>{ch.participant_count} participants</Text>
+                      </View>
+                      <View style={styles.joinHint}>
+                        <Text style={styles.joinText}>Rejoindre</Text>
+                        <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -145,54 +106,29 @@ export default function ChallengesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm,
-  },
-  title: { fontSize: 28, fontWeight: '800', color: COLORS.textPrimary, letterSpacing: -0.5 },
-  createBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
-  },
-  tabScroll: { paddingHorizontal: SPACING.lg, gap: SPACING.sm, paddingBottom: SPACING.sm },
-  filterTab: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill, backgroundColor: COLORS.card,
-    borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
+  title: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
+  createBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  tabScroll: { paddingHorizontal: 20, paddingBottom: 8, gap: 8 },
+  filterTab: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, marginRight: 8 },
   filterTabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   filterText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  filterTextActive: { color: '#FFFFFF' },
-  // ===== IMMERSIVE CARD =====
-  card: {
-    marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
-    borderRadius: RADIUS.md, overflow: 'hidden', height: 180,
-    backgroundColor: COLORS.card,
-  },
-  cardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  cardOverlay: { ...StyleSheet.absoluteFillObject },
-  cardContent: {
-    ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: SPACING.md,
-  },
+  filterTextActive: { color: '#FFF' },
+  // Cards
+  card: { marginHorizontal: 20, marginBottom: 14, borderRadius: 20, overflow: 'hidden', height: 195 },
+  cardContent: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: 16 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  catBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.sm,
-  },
-  catText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  durationBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: SPACING.sm,
-    paddingVertical: 4, borderRadius: RADIUS.sm,
-  },
-  durationText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
-  cardTitle: { fontSize: 20, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
-  cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 18 },
+  catPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  catPillText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  durPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  durText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
+  cardTitle: { fontSize: 22, fontWeight: '900', color: '#FFF', letterSpacing: -0.3, marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 18, marginBottom: 10 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  footerText: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.6)' },
-  joinHint: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  joinHintText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-  empty: { alignItems: 'center', paddingTop: 60, gap: SPACING.md },
+  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  footerText: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.55)' },
+  joinHint: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.primary + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  joinText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
+  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 16, fontWeight: '600', color: COLORS.textMuted },
 });

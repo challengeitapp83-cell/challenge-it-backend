@@ -29,35 +29,37 @@ export default function ProfileScreen() {
     { icon: 'heart', color: COLORS.secondary, value: user?.reputation || 0, label: 'Réputation' },
   ];
 
+  const progressPct = ((user?.points || 0) % 100);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            {user?.picture ? (
-              <Image source={{ uri: user.picture }} style={styles.avatar} />
-            ) : (
-              <LinearGradient colors={['#007AFF', '#9D4CDD']} style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
-                </Text>
-              </LinearGradient>
-            )}
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelNum}>{user?.level || 1}</Text>
+        {/* Profile Header with gradient bg */}
+        <LinearGradient colors={['#007AFF15', '#9D4CDD10', COLORS.background]} style={styles.profileBg}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarWrap}>
+              {user?.picture ? (
+                <Image source={{ uri: user.picture }} style={styles.avatar} />
+              ) : (
+                <LinearGradient colors={['#007AFF', '#9D4CDD']} style={styles.avatar}>
+                  <Text style={styles.avatarInitial}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                </LinearGradient>
+              )}
+              <View style={styles.levelBadge}>
+                <Text style={styles.levelNum}>{user?.level || 1}</Text>
+              </View>
             </View>
+            <Text style={styles.name}>{user?.name || 'Challenger'}</Text>
+            <Text style={styles.email}>{user?.email}</Text>
           </View>
-          <Text style={styles.name}>{user?.name || 'Challenger'}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-        </View>
+        </LinearGradient>
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
+        {/* Stats */}
+        <View style={styles.statsRow}>
           {stats.map((s, i) => (
-            <View key={i} style={styles.statItem}>
-              <View style={[styles.statIconWrap, { backgroundColor: s.color + '15' }]}>
-                <Ionicons name={s.icon as any} size={22} color={s.color} />
+            <View key={i} style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: s.color + '18' }]}>
+                <Ionicons name={s.icon as any} size={20} color={s.color} />
               </View>
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -72,11 +74,11 @@ export default function ProfileScreen() {
             {Object.entries(BADGE_CONFIG).map(([id, badge]) => {
               const earned = user?.badges?.includes(id);
               return (
-                <View key={id} style={[styles.badgeItem, !earned && styles.badgeLocked]}>
+                <View key={id} style={[styles.badgeItem, !earned && { opacity: 0.3 }]}>
                   <View style={[styles.badgeCircle, earned && { borderColor: badge.color }]}>
-                    <Ionicons name={badge.icon as any} size={24} color={earned ? badge.color : COLORS.textMuted} />
+                    <Ionicons name={badge.icon as any} size={22} color={earned ? badge.color : COLORS.textMuted} />
                   </View>
-                  <Text style={[styles.badgeLabel, earned && { color: COLORS.textPrimary }]}>{badge.label}</Text>
+                  <Text style={[styles.badgeLabel, earned && { color: '#FFF' }]}>{badge.label}</Text>
                 </View>
               );
             })}
@@ -87,27 +89,19 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Progression</Text>
           <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
+            <View style={styles.progressTop}>
               <Text style={styles.progressLabel}>Niveau {user?.level || 1}</Text>
-              <Text style={styles.progressLabel}>
-                {(user?.points || 0) % 100}/100 pts
-              </Text>
+              <Text style={styles.progressLabel}>{progressPct}/100 pts</Text>
             </View>
-            <View style={styles.progressBarBg}>
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.progressBarFill, { width: `${((user?.points || 0) % 100)}%` as any }]}
-              />
+            <View style={styles.progressBg}>
+              <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={[styles.progressFill, { width: `${Math.max(progressPct, 2)}%` as any }]} />
             </View>
-            <Text style={styles.progressHint}>
-              {100 - ((user?.points || 0) % 100)} points pour le niveau suivant
-            </Text>
+            <Text style={styles.progressHint}>{100 - progressPct} points pour le niveau suivant</Text>
           </View>
         </View>
 
-        {/* Actions */}
+        {/* Logout */}
         <View style={styles.section}>
           <TouchableOpacity testID="logout-btn" onPress={handleLogout} style={styles.logoutBtn}>
             <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
@@ -121,59 +115,32 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  profileHeader: {
-    alignItems: 'center', paddingTop: SPACING.xl, paddingBottom: SPACING.lg,
-  },
-  avatarContainer: { position: 'relative', marginBottom: SPACING.md },
-  avatar: {
-    width: 88, height: 88, borderRadius: 44, justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: COLORS.primary,
-  },
-  avatarText: { fontSize: 36, fontWeight: '800', color: '#FFF' },
-  levelBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    backgroundColor: COLORS.primary, borderRadius: 14, width: 28, height: 28,
-    justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.background,
-  },
-  levelNum: { fontSize: 12, fontWeight: '800', color: '#FFF' },
-  name: { fontSize: 24, fontWeight: '800', color: COLORS.textPrimary },
-  email: { fontSize: 14, color: COLORS.textMuted, marginTop: SPACING.xs },
-  statsGrid: {
-    flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
-  statItem: {
-    flex: 1, backgroundColor: COLORS.card, borderRadius: RADIUS.md,
-    padding: SPACING.md, alignItems: 'center', gap: SPACING.xs,
-    borderWidth: 1, borderColor: COLORS.border,
-  },
-  statIconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  statValue: { fontSize: 20, fontWeight: '800', color: COLORS.textPrimary },
-  statLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted, textTransform: 'uppercase' },
-  section: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.md },
-  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
+  profileBg: { paddingBottom: 24 },
+  profileHeader: { alignItems: 'center', paddingTop: 32 },
+  avatarWrap: { position: 'relative', marginBottom: 14 },
+  avatar: { width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.primary },
+  avatarInitial: { fontSize: 40, fontWeight: '800', color: '#FFF' },
+  levelBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.primary, borderRadius: 15, width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.background },
+  levelNum: { fontSize: 13, fontWeight: '900', color: '#FFF' },
+  name: { fontSize: 26, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
+  email: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 24 },
+  statCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 14, paddingVertical: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.border },
+  statIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  statValue: { fontSize: 22, fontWeight: '900', color: '#FFF' },
+  statLabel: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  section: { paddingHorizontal: 20, marginBottom: 24 },
+  sectionTitle: { fontSize: 19, fontWeight: '800', color: '#FFF', marginBottom: 14 },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   badgeItem: { alignItems: 'center', width: 72 },
-  badgeLocked: { opacity: 0.35 },
-  badgeCircle: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.card,
-    borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
+  badgeCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.card, borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
   badgeLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textMuted, textAlign: 'center' },
-  progressCard: {
-    backgroundColor: COLORS.card, borderRadius: RADIUS.md, padding: SPACING.md,
-    borderWidth: 1, borderColor: COLORS.border,
-  },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  progressCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+  progressTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   progressLabel: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  progressBarBg: { height: 10, backgroundColor: '#2C2C2E', borderRadius: 5, overflow: 'hidden' },
-  progressBarFill: { height: '100%', borderRadius: 5 },
-  progressHint: { fontSize: 12, color: COLORS.textMuted, marginTop: SPACING.sm, textAlign: 'center' },
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SPACING.sm, paddingVertical: SPACING.md, backgroundColor: COLORS.card,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.error + '30',
-  },
+  progressBg: { height: 10, backgroundColor: '#2C2C2E', borderRadius: 5, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 5 },
+  progressHint: { fontSize: 12, color: COLORS.textMuted, marginTop: 10, textAlign: 'center' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.error + '25' },
   logoutText: { fontSize: 16, fontWeight: '600', color: COLORS.error },
 });
