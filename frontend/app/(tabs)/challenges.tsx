@@ -125,10 +125,10 @@ export default function ChallengesScreen() {
   return (
     <View style={[styles.container]}>
       {/* Immersive Background */}
-      <Image source={{ uri: CHALLENGES_BG }} style={styles.bgImg} blurRadius={3} />
+      <Image source={{ uri: CHALLENGES_BG }} style={styles.bgImg} blurRadius={1} />
       <LinearGradient
-        colors={['rgba(0,50,180,0.15)', 'rgba(255,100,0,0.1)', 'rgba(15,15,15,0.9)', COLORS.background]}
-        locations={[0, 0.15, 0.4, 0.55]}
+        colors={['rgba(255,100,0,0.3)', 'rgba(0,80,255,0.25)', 'rgba(15,15,25,0.7)', COLORS.background]}
+        locations={[0, 0.18, 0.5, 0.7]}
         style={styles.bgOverlay}
       />
       <View style={{ paddingTop: insets.top }}>
@@ -213,8 +213,8 @@ export default function ChallengesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' },
-  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 500, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 500 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 8 },
   title: { fontSize: 28, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
   createBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },

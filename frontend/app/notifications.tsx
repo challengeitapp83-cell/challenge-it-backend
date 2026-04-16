@@ -59,10 +59,10 @@ export default function NotificationsScreen() {
   return (
     <View style={[g.root, { paddingTop: insets.top }]}>
       {/* Immersive Background */}
-      <Image source={{ uri: NOTIF_BG }} style={g.bgImg} blurRadius={5} />
+      <Image source={{ uri: NOTIF_BG }} style={g.bgImg} blurRadius={1} />
       <LinearGradient
-        colors={['rgba(100,0,200,0.12)', 'rgba(0,30,100,0.15)', 'rgba(12,12,24,0.92)', '#0C0C18']}
-        locations={[0, 0.1, 0.35, 0.5]}
+        colors={['rgba(120,0,255,0.3)', 'rgba(0,80,200,0.25)', 'rgba(12,12,30,0.7)', '#0C0C18']}
+        locations={[0, 0.15, 0.45, 0.65]}
         style={g.bgOverlay}
       />
       <View style={g.header}>
@@ -115,8 +115,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
-  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' } as any,
-  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 500, width: '100%' } as any,
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 500 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   backBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, fontSize: 24, fontWeight: '900', color: '#FFF' },

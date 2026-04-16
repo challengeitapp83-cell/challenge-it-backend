@@ -190,10 +190,10 @@ export default function PublishScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={[g.container]}>
         {/* Immersive Background */}
-        <Image source={{ uri: PUBLISH_BG }} style={g.bgImg} blurRadius={3} />
+        <Image source={{ uri: PUBLISH_BG }} style={g.bgImg} blurRadius={1} />
         <LinearGradient
-          colors={['rgba(0,80,200,0.15)', 'rgba(120,0,200,0.12)', 'rgba(15,15,15,0.92)', COLORS.background]}
-          locations={[0, 0.12, 0.38, 0.52]}
+          colors={['rgba(0,120,255,0.3)', 'rgba(180,0,255,0.25)', 'rgba(15,15,25,0.72)', COLORS.background]}
+          locations={[0, 0.15, 0.48, 0.68]}
           style={g.bgOverlay}
         />
         <View style={{ paddingTop: insets.top }}>
@@ -337,8 +337,8 @@ const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor:
 
 const g = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' },
-  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 500, width: '100%' },
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 500 },
   header: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xs },
   title: { fontSize: 26, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
   sub: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginTop: 4 },

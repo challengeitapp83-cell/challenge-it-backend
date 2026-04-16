@@ -112,8 +112,8 @@ export default function LoginScreen() {
         <Animated.Image source={{ uri: BG_IMG }} style={[s.bgImg, { transform: [{ scale: bgScale }] }]} />
       </Animated.View>
       <LinearGradient
-        colors={['rgba(0,0,0,0.1)', 'rgba(5,5,15,0.5)', 'rgba(8,8,20,0.85)', 'rgba(10,10,22,0.97)']}
-        locations={[0, 0.3, 0.58, 0.78]}
+        colors={['rgba(0,60,255,0.25)', 'rgba(140,30,220,0.2)', 'rgba(10,10,25,0.65)', 'rgba(10,10,22,0.92)']}
+        locations={[0, 0.25, 0.55, 0.78]}
         style={s.overlay}
       />
 

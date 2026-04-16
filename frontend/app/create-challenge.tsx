@@ -129,10 +129,10 @@ export default function CreateChallengeScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={[g.root]}>
         {/* Immersive Background */}
-        <Image source={{ uri: CREATE_BG }} style={g.bgImg} blurRadius={4} />
+        <Image source={{ uri: CREATE_BG }} style={g.bgImg} blurRadius={1} />
         <LinearGradient
-          colors={['rgba(20,0,80,0.2)', 'rgba(0,40,100,0.15)', 'rgba(12,12,24,0.92)', '#0C0C18']}
-          locations={[0, 0.12, 0.36, 0.5]}
+          colors={['rgba(30,0,120,0.35)', 'rgba(0,80,200,0.25)', 'rgba(12,12,30,0.72)', '#0C0C18']}
+          locations={[0, 0.15, 0.45, 0.65]}
           style={g.bgOverlay}
         />
         <View style={{ paddingTop: insets.top }}>
@@ -397,8 +397,8 @@ const GL = { backgroundColor: 'rgba(22,22,38,0.55)', borderWidth: 1, borderColor
 
 const g = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0C0C18' },
-  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 400, width: '100%' } as any,
-  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 400 },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, height: 500, width: '100%' } as any,
+  bgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 500 },
   hdr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 14 },
   hdrBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
   progW: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
