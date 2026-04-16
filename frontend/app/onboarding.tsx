@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../contexts/api';
 import { useAuth } from '../contexts/AuthContext';
+import { BrandLogoImage } from '../components/BrandLogo';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -117,6 +118,7 @@ export default function OnboardingScreen() {
         {step === 0 && (
           <View style={g.stepW}>
             <View style={{ flex: 1, justifyContent: 'center' }}>
+              <BrandLogoImage height={44} />
               <Text style={s0.title}>Depasse{'\n'}tes limites.</Text>
               <Text style={s0.sub}>Prouve que tu peux tenir.</Text>
               <View style={s0.tagRow}>

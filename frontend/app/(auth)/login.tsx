@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../contexts/theme';
+import { BrandLogoImage } from '../../components/BrandLogo';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
@@ -138,6 +139,7 @@ export default function LoginScreen() {
 
         {/* Hero text */}
         <Animated.View style={[s.textBlock, { opacity: textOpacity, transform: [{ translateY: textSlide }] }]}>
+          <BrandLogoImage height={42} />
           <Text style={s.title}>Dépasse{'\n'}tes limites.</Text>
           <Text style={s.subtitle}>Crée des défis. Mise. Gagne.</Text>
           <Text style={s.hook}>Transforme tes objectifs en résultats réels.</Text>

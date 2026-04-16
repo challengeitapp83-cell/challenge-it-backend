@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../contexts/api';
 import { COLORS, CATEGORIES, BADGE_CONFIG, getChallengeImage } from '../../contexts/theme';
+import { BrandLogoImage, BrandMini } from '../../components/BrandLogo';
 
 const { width: W, height: H } = Dimensions.get('window');
 const HERO_BG = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1000&h=1400&fit=crop&q=80';
@@ -139,6 +140,7 @@ export default function HomeScreen() {
 
           {/* Motivational text */}
           <Fade delay={100}>
+            <BrandLogoImage height={38} />
             <Text style={h.motto}>Depasse{'\n'}tes limites.</Text>
           </Fade>
 
