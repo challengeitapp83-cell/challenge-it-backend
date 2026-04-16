@@ -27,24 +27,24 @@ function ActionMenu({ visible, onClose, router }: { visible: boolean; onClose: (
   if (!visible) return null;
 
   const actions = [
-    { icon: 'flash', label: 'Créer un défi', color: COLORS.primary, route: '/create-challenge' },
-    { icon: 'enter', label: 'Rejoindre un défi', color: COLORS.success, route: '/(tabs)/challenges' },
-    { icon: 'people', label: 'Défier un ami', color: COLORS.secondary, route: '/create-challenge' },
+    { icon: 'flash', label: 'Creer un defi', color: '#007AFF', route: '/create-challenge' },
+    { icon: 'enter', label: 'Rejoindre un defi', color: '#34C759', route: '/(tabs)/challenges' },
+    { icon: 'people', label: 'Defier un ami', color: '#AF52DE', route: '/social' },
   ];
 
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
-      <Pressable style={m.overlay} onPress={onClose}>
-        <Animated.View style={[m.menu, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
+      <Pressable style={mn.overlay} onPress={onClose}>
+        <Animated.View style={[mn.menu, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
           {actions.map((a, i) => (
-            <TouchableOpacity key={i} testID={`action-${a.icon}`} activeOpacity={0.8}
+            <TouchableOpacity key={i} activeOpacity={0.8}
               onPress={() => { onClose(); router.push(a.route); }}
-              style={m.menuItem}>
-              <View style={[m.menuIcon, { backgroundColor: a.color + '18' }]}>
+              style={mn.menuItem}>
+              <View style={[mn.menuIcon, { backgroundColor: a.color + '18' }]}>
                 <Ionicons name={a.icon as any} size={22} color={a.color} />
               </View>
-              <Text style={m.menuLabel}>{a.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+              <Text style={mn.menuLabel}>{a.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
             </TouchableOpacity>
           ))}
         </Animated.View>
@@ -53,11 +53,11 @@ function ActionMenu({ visible, onClose, router }: { visible: boolean; onClose: (
   );
 }
 
-const m = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', paddingBottom: 100, paddingHorizontal: 20 },
-  menu: { backgroundColor: '#1A1A2E', borderRadius: 20, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 16, borderRadius: 14 },
-  menuIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+const mn = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end', paddingBottom: 110, paddingHorizontal: 20 },
+  menu: { backgroundColor: '#16162A', borderRadius: 22, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 16, borderRadius: 16 },
+  menuIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   menuLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFF' },
 });
 
@@ -66,28 +66,34 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.06, duration: 1400, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 1400, useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(glowAnim, { toValue: 0.8, duration: 1400, useNativeDriver: true }),
+      Animated.timing(glowAnim, { toValue: 0.4, duration: 1400, useNativeDriver: true }),
+    ])).start();
   }, []);
 
   const tabs = [
-    { name: 'index', label: 'Accueil', icon: 'home' },
-    { name: 'challenges', label: 'Défis', icon: 'flame' },
-    { name: 'publish', label: '', icon: 'add' },
-    { name: 'leaderboard', label: 'Classement', icon: 'podium' },
-    { name: 'profile', label: 'Profil', icon: 'person' },
+    { name: 'index', label: 'Accueil', icon: 'home', activeColor: '#007AFF' },
+    { name: 'challenges', label: 'Defis', icon: 'flame', activeColor: '#FF6B35' },
+    { name: 'publish', label: '', icon: 'add', activeColor: '#007AFF' },
+    { name: 'leaderboard', label: 'Rang', icon: 'podium', activeColor: '#FFD700' },
+    { name: 'profile', label: 'Profil', icon: 'person', activeColor: '#AF52DE' },
   ];
 
   return (
     <>
       <ActionMenu visible={menuOpen} onClose={() => setMenuOpen(false)} router={router} />
-      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={[tb.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        {/* Blur background */}
+        <View style={tb.barBg} />
+
         {state.routes.map((route: any, index: number) => {
           const tab = tabs[index];
           if (!tab) return null;
@@ -95,20 +101,28 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           const isCenter = tab.name === 'publish';
 
           const onPress = () => {
-            if (isCenter) {
-              setMenuOpen(true);
-              return;
-            }
+            if (isCenter) { setMenuOpen(true); return; }
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
           };
 
           if (isCenter) {
             return (
-              <TouchableOpacity key={tab.name} testID="tab-publish" onPress={onPress} activeOpacity={0.8} style={styles.centerWrap}>
+              <TouchableOpacity key={tab.name} onPress={onPress} activeOpacity={0.8} style={tb.centerWrap}>
+                {/* Glow behind button */}
+                <Animated.View style={[tb.centerGlow, { opacity: glowAnim }]} />
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                  <LinearGradient colors={['#007AFF', '#9D4CDD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.centerBtn}>
-                    <Ionicons name="add" size={32} color="#FFF" />
+                  <LinearGradient
+                    colors={['#00D4FF', '#007AFF', '#C850C0']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={tb.centerBtn}
+                  >
+                    {/* IT icon */}
+                    <View style={tb.itRow}>
+                      <Text style={tb.itI}>I</Text>
+                      <Ionicons name="flash-sharp" size={16} color="#FFF" style={{ marginHorizontal: -3 }} />
+                      <Text style={tb.itT}>T</Text>
+                    </View>
                   </LinearGradient>
                 </Animated.View>
               </TouchableOpacity>
@@ -116,10 +130,16 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           }
 
           return (
-            <TouchableOpacity key={tab.name} testID={`tab-${tab.name}`} onPress={onPress} activeOpacity={0.7} style={styles.tab}>
-              <Ionicons name={(isFocused ? tab.icon : `${tab.icon}-outline`) as any} size={24}
-                color={isFocused ? COLORS.primary : COLORS.textMuted} />
-              <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{tab.label}</Text>
+            <TouchableOpacity key={tab.name} onPress={onPress} activeOpacity={0.7} style={tb.tab}>
+              {/* Active glow dot */}
+              {isFocused && <View style={[tb.activeGlow, { backgroundColor: tab.activeColor }]} />}
+              <Ionicons
+                name={(isFocused ? tab.icon : `${tab.icon}-outline`) as any}
+                size={22}
+                color={isFocused ? tab.activeColor : 'rgba(255,255,255,0.3)'}
+              />
+              <Text style={[tb.label, isFocused && { color: tab.activeColor }]}>{tab.label}</Text>
+              {isFocused && <View style={[tb.activeDot, { backgroundColor: tab.activeColor }]} />}
             </TouchableOpacity>
           );
         })}
@@ -140,11 +160,42 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  tabBar: { flexDirection: 'row', backgroundColor: '#0A0A14', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)', paddingTop: 8, alignItems: 'center', justifyContent: 'space-around' },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 2 },
-  tabLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textMuted, marginTop: 2 },
-  tabLabelActive: { color: COLORS.primary },
-  centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -30 },
-  centerBtn: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10 },
+const tb = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    paddingTop: 8,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    position: 'relative',
+  },
+  barBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8,8,20,0.92)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 3, zIndex: 1 },
+  label: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.3)' },
+  activeGlow: { position: 'absolute', top: -6, width: 36, height: 3, borderRadius: 2, opacity: 0.6 },
+  activeDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -28, zIndex: 10 },
+  centerGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+  },
+  centerBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(8,8,20,0.9)',
+  },
+  itRow: { flexDirection: 'row', alignItems: 'center' },
+  itI: { fontSize: 18, fontWeight: '900', color: '#FFF' },
+  itT: { fontSize: 18, fontWeight: '900', color: '#FFF' },
 });
