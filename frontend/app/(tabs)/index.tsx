@@ -283,7 +283,7 @@ export default function HomeScreen() {
                 )}
                 {leaderboard.length > 0 && (
                   <View style={[styles.podiumItem, styles.podiumFirst]}>
-                    <Ionicons name="crown" size={24} color={COLORS.warning} style={styles.crown} />
+                    <Ionicons name="trophy" size={24} color={COLORS.warning} style={styles.crown} />
                     <View style={[styles.podiumAvatar, styles.podium1]}>
                       {leaderboard[0]?.picture ? (
                         <Image source={{ uri: leaderboard[0].picture }} style={styles.podiumImg} />

@@ -90,7 +90,7 @@ export default function LeaderboardScreen() {
               {/* 1st */}
               {leaderboard.length > 0 && (
                 <View style={[styles.podiumItem, { marginTop: -20 }]}>
-                  <Ionicons name="crown" size={28} color={COLORS.warning} style={{ marginBottom: 4 }} />
+                  <Ionicons name="trophy" size={28} color={COLORS.warning} style={{ marginBottom: 4 }} />
                   <View style={[styles.podiumAvatarWrap, { borderColor: COLORS.warning }]}>
                     {renderAvatar(leaderboard[0], 72)}
                   </View>
