@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../contexts/api';
 import { COLORS, CATEGORIES, BADGE_CONFIG, getChallengeImage } from '../../contexts/theme';
-import { BrandLogoImage, BrandMini } from '../../components/BrandLogo';
+import { BrandLogoImage, BrandIcon } from '../../components/BrandLogo';
 
 const { width: W, height: H } = Dimensions.get('window');
 const HERO_BG = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1000&h=1400&fit=crop&q=80';
@@ -114,7 +114,7 @@ export default function HomeScreen() {
             <View style={h.topBar}>
               <View style={h.avW}>
                 {user?.picture ? <Image source={{ uri: user.picture }} style={h.av} /> :
-                  <LinearGradient colors={['#007AFF', '#AF52DE']} style={h.av}>
+                  <LinearGradient colors={['#00D4FF', '#C850C0']} style={h.av}>
                     <Text style={h.avI}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
                   </LinearGradient>}
                 <View style={h.lvlBadge}><Text style={h.lvlN}>{user?.level || 1}</Text></View>
@@ -138,9 +138,15 @@ export default function HomeScreen() {
             </View>
           </Fade>
 
-          {/* Motivational text */}
+          {/* Logo + Motivational text */}
           <Fade delay={100}>
-            <BrandLogoImage height={38} />
+            <View style={h.brandRow}>
+              <BrandIcon size={56} />
+              <View style={h.brandText}>
+                <Text style={h.brandName}>CHALLENGE <Text style={h.brandCyan}>I</Text><Text style={h.brandMag}>T</Text></Text>
+                <Text style={h.brandTag}>Mise. Challenge. Gagne.</Text>
+              </View>
+            </View>
             <Text style={h.motto}>Depasse{'\n'}tes limites.</Text>
           </Fade>
 
@@ -152,7 +158,7 @@ export default function HomeScreen() {
                 <Text style={h.xpVal}>{xpPct}/100 XP</Text>
               </View>
               <View style={h.xpBg}>
-                <LinearGradient colors={['#007AFF', '#AF52DE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                <LinearGradient colors={['#00D4FF', '#C850C0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[h.xpFill, { width: `${Math.max(xpPct, 4)}%` as any }]} />
               </View>
             </View>
@@ -358,7 +364,7 @@ export default function HomeScreen() {
         <Fade delay={350}>
           <View style={cta.w}>
             <TouchableOpacity onPress={() => router.push('/create-challenge')} activeOpacity={0.85}>
-              <LinearGradient colors={['#007AFF', '#AF52DE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={cta.btn}>
+              <LinearGradient colors={['#00D4FF', '#007AFF', '#C850C0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={cta.btn}>
                 <Ionicons name="flash" size={22} color="#FFF" />
                 <Text style={cta.btnT}>Lance un defi</Text>
                 <Ionicons name="arrow-forward" size={20} color="#FFF" />
@@ -409,21 +415,27 @@ const h = StyleSheet.create({
   w: { paddingHorizontal: 20, paddingBottom: 18, minHeight: H * 0.38 },
   topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   avW: { position: 'relative' },
-  av: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#007AFF' },
+  av: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#00D4FF' },
   avI: { fontSize: 18, fontWeight: '800', color: '#FFF' },
-  lvlBadge: { position: 'absolute', bottom: -3, right: -3, backgroundColor: '#007AFF', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#0C0C1A' },
+  lvlBadge: { position: 'absolute', bottom: -3, right: -3, backgroundColor: '#00D4FF', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#0C0C1A' },
   lvlN: { fontSize: 9, fontWeight: '900', color: '#FFF' },
   greeting: { fontSize: 17, fontWeight: '800', color: '#FFF' },
   rankRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  rankT: { fontSize: 14, fontWeight: '900', color: '#007AFF' },
+  rankT: { fontSize: 14, fontWeight: '900', color: '#00D4FF' },
   rankSep: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
   rankHint: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.25)' },
   notifBtn: { width: 44, height: 44, borderRadius: 22, ...GL, justifyContent: 'center', alignItems: 'center' },
   notifDot: { position: 'absolute', top: 8, right: 10, width: 9, height: 9, borderRadius: 5, backgroundColor: '#FF3B30' },
   motto: { fontSize: 36, fontWeight: '900', color: '#FFF', lineHeight: 42, letterSpacing: -1, marginBottom: 18 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  brandText: { gap: 2 },
+  brandName: { fontSize: 20, fontWeight: '900', color: '#FFF', letterSpacing: 1 },
+  brandCyan: { color: '#00D4FF' },
+  brandMag: { color: '#C850C0' },
+  brandTag: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
   xpCard: { ...GL, borderRadius: 14, padding: 12 },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  xpLvl: { fontSize: 13, fontWeight: '800', color: '#007AFF' },
+  xpLvl: { fontSize: 13, fontWeight: '800', color: '#00D4FF' },
   xpVal: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
   xpBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
   xpFill: { height: '100%', borderRadius: 3 },
