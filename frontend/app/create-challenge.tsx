@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { api } from '../contexts/api';
 import { COLORS } from '../contexts/theme';
 
@@ -70,6 +70,7 @@ function ScalePress({ children, onPress, testID, style, disabled }: any) {
 export default function CreateChallengeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ tplTitle?: string; tplDesc?: string; tplCat?: string; tplDays?: string }>();
 
   const [step, setStep] = useState(0);
   const [type, setType] = useState('');
@@ -81,6 +82,18 @@ export default function CreateChallengeScreen() {
   const [potAmount, setPotAmount] = useState(10);
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Pre-fill from template params
+  useEffect(() => {
+    if (params.tplTitle) {
+      setTitle(params.tplTitle);
+      setType('community');
+      setStake('none');
+      if (params.tplCat) setCategory(params.tplCat);
+      if (params.tplDays) setDuration(parseInt(params.tplDays, 10) || 7);
+      setStep(3); // Skip to the last step (title + confirmation)
+    }
+  }, [params.tplTitle]);
 
   // Animated progress
   const prog = useRef(new Animated.Value(0)).current;

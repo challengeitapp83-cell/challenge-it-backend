@@ -31,6 +31,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [trending, setTrending] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [lb, setLb] = useState<any[]>([]);
   const [pressure, setPressure] = useState<any[]>([]);
   const [rankData, setRankData] = useState<any>(null);
@@ -67,15 +68,16 @@ export default function HomeScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [t, l, sp, rd, ms, tr2] = await Promise.all([
+      const [t, tpl, l, sp, rd, ms, tr2] = await Promise.all([
         api.get('/api/challenges/trending?limit=8').catch(() => []),
+        api.get('/api/challenge-templates').catch(() => []),
         api.get('/api/leaderboard?limit=5').catch(() => []),
         api.get('/api/social-pressure').catch(() => []),
         api.get('/api/user-rank').catch(() => null),
         api.get('/api/money-stats').catch(() => null),
         api.get('/api/daily-triggers').catch(() => []),
       ]);
-      setTrending(t); setLb(l);
+      setTrending(t); setTemplates(tpl); setLb(l);
       setPressure(sp); setRankData(rd); setMoneyStats(ms); setTriggers(tr2);
     } catch {} finally { setLoading(false); }
   }, []);
@@ -219,6 +221,48 @@ export default function HomeScreen() {
             ))}
           </View>
         </Fade>
+
+        {/* ===== DEFIS POPULAIRES (TEMPLATES) ===== */}
+        {templates.length > 0 && (
+          <Fade delay={245}>
+            <View style={sec.w}>
+              <View style={sec.h}>
+                <View style={sec.hL}><Ionicons name="flame" size={18} color="#FF6B35" /><Text style={sec.t}>Defis populaires</Text></View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
+                {templates.map((tpl: any) => (
+                  <TouchableOpacity
+                    key={tpl.id}
+                    onPress={() => router.push({
+                      pathname: '/create-challenge',
+                      params: { tplTitle: tpl.title, tplDesc: tpl.description, tplCat: tpl.category, tplDays: String(tpl.duration_days) },
+                    })}
+                    activeOpacity={0.85}
+                    style={tp.card}
+                  >
+                    <Image source={{ uri: tpl.image }} style={StyleSheet.absoluteFill} />
+                    <LinearGradient colors={['rgba(0,30,100,0.1)', 'rgba(12,12,24,0.93)']} locations={[0.2, 1]} style={StyleSheet.absoluteFill} />
+                    {/* Badge */}
+                    <View style={[tp.badge, { backgroundColor: tpl.badge_color + '25', borderColor: tpl.badge_color + '40' }]}>
+                      <Text style={[tp.badgeT, { color: tpl.badge_color }]}>{tpl.badge}</Text>
+                    </View>
+                    <View style={tp.bot}>
+                      <Text style={tp.title} numberOfLines={2}>{tpl.title}</Text>
+                      <Text style={tp.desc} numberOfLines={1}>{tpl.description}</Text>
+                      <View style={tp.meta}>
+                        <View style={tp.metaI}><Ionicons name="time" size={11} color="rgba(255,255,255,0.5)" /><Text style={tp.metaT}>{tpl.duration_days}j</Text></View>
+                        <View style={tp.launchBtn}>
+                          <Text style={tp.launchT}>Lancer</Text>
+                          <Ionicons name="arrow-forward" size={12} color="#FFF" />
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </Fade>
+        )}
 
         {/* ===== LIVE ACTIVITY ===== */}
         {pressure.length > 0 && (
@@ -479,4 +523,18 @@ const lbr = StyleSheet.create({
   avI: { fontSize: 14, fontWeight: '800', color: '#FFF' },
   name: { fontSize: 13, fontWeight: '700', color: '#FFF' },
   pts: { fontSize: 15, fontWeight: '900', color: '#007AFF' },
+});
+
+const tp = StyleSheet.create({
+  card: { width: 175, height: 230, borderRadius: 20, overflow: 'hidden', marginRight: 12 },
+  badge: { position: 'absolute', top: 10, left: 10, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, zIndex: 2 },
+  badgeT: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  bot: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12 },
+  title: { fontSize: 16, fontWeight: '900', color: '#FFF', lineHeight: 20, marginBottom: 4 },
+  desc: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.5)', lineHeight: 15, marginBottom: 8 },
+  meta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  metaI: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metaT: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
+  launchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  launchT: { fontSize: 12, fontWeight: '700', color: '#FFF' },
 });

@@ -1239,6 +1239,126 @@ async def like_proof(proof_id: str, user: User = Depends(get_current_user)):
         )
         return {"liked": True}
 
+# ==================== CHALLENGE TEMPLATES ====================
+
+CHALLENGE_TEMPLATES = [
+    {
+        "id": "tpl_no_sugar",
+        "title": "7 jours sans sucre",
+        "description": "Zero sucre pendant 7 jours. Tu tiens ou tu craques ?",
+        "category": "Sante",
+        "duration_days": 7,
+        "difficulty": "moyen",
+        "image": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&h=500&fit=crop&q=80",
+        "badge": "Populaire",
+        "badge_color": "#FF6B35",
+    },
+    {
+        "id": "tpl_no_smoke",
+        "title": "7 jours sans cigarette",
+        "description": "7 jours pour reprendre le controle.",
+        "category": "Sante",
+        "duration_days": 7,
+        "difficulty": "difficile",
+        "image": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=500&fit=crop&q=80",
+        "badge": "Top defi",
+        "badge_color": "#FF3B30",
+    },
+    {
+        "id": "tpl_wake_6am",
+        "title": "Se lever a 6h - 7 jours",
+        "description": "Discipline totale. Pas d'excuse.",
+        "category": "Motivation",
+        "duration_days": 7,
+        "difficulty": "moyen",
+        "image": "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=800&h=500&fit=crop&q=80",
+        "badge": "Recommande",
+        "badge_color": "#007AFF",
+    },
+    {
+        "id": "tpl_focus_1h",
+        "title": "1h de focus par jour",
+        "description": "Zero distraction. 100% concentration.",
+        "category": "Business",
+        "duration_days": 7,
+        "difficulty": "facile",
+        "image": "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&h=500&fit=crop&q=80",
+        "badge": "Populaire",
+        "badge_color": "#FF6B35",
+    },
+    {
+        "id": "tpl_20_pushups",
+        "title": "20 pompes par jour",
+        "description": "Simple. Mais tu vas tenir combien de jours ?",
+        "category": "Sport",
+        "duration_days": 14,
+        "difficulty": "moyen",
+        "image": "https://images.unsplash.com/photo-1598971639058-a5e4f1e34b30?w=800&h=500&fit=crop&q=80",
+        "badge": "Top defi",
+        "badge_color": "#FF3B30",
+    },
+    {
+        "id": "tpl_project_7d",
+        "title": "Travaille sur ton projet",
+        "description": "Pas d'excuse. 1h par jour minimum.",
+        "category": "Business",
+        "duration_days": 7,
+        "difficulty": "moyen",
+        "image": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=500&fit=crop&q=80",
+        "badge": "Recommande",
+        "badge_color": "#007AFF",
+    },
+    {
+        "id": "tpl_water_2l",
+        "title": "2L d'eau par jour",
+        "description": "Hydratation = discipline.",
+        "category": "Sante",
+        "duration_days": 14,
+        "difficulty": "facile",
+        "image": "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=800&h=500&fit=crop&q=80",
+        "badge": "Facile",
+        "badge_color": "#34C759",
+    },
+    {
+        "id": "tpl_no_social",
+        "title": "Zero reseaux sociaux 3j",
+        "description": "Deconnecte pour te reconnecter.",
+        "category": "Motivation",
+        "duration_days": 3,
+        "difficulty": "difficile",
+        "image": "https://images.unsplash.com/photo-1523475496153-3d6cc0f0bf19?w=800&h=500&fit=crop&q=80",
+        "badge": "Hardcore",
+        "badge_color": "#AF52DE",
+    },
+    {
+        "id": "tpl_run_15min",
+        "title": "Courir 15 min par jour",
+        "description": "Pas long. Mais constant.",
+        "category": "Sport",
+        "duration_days": 7,
+        "difficulty": "moyen",
+        "image": "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&h=500&fit=crop&q=80",
+        "badge": "Populaire",
+        "badge_color": "#FF6B35",
+    },
+    {
+        "id": "tpl_comfort_zone",
+        "title": "Sors de ta zone de confort",
+        "description": "Fais quelque chose que tu repousses.",
+        "category": "Motivation",
+        "duration_days": 7,
+        "difficulty": "difficile",
+        "image": "https://images.unsplash.com/photo-1519834785169-98be25ec3f84?w=800&h=500&fit=crop&q=80",
+        "badge": "Hardcore",
+        "badge_color": "#AF52DE",
+    },
+]
+
+@api_router.get("/challenge-templates")
+async def get_challenge_templates():
+    """Get predefined challenge templates"""
+    return CHALLENGE_TEMPLATES
+
 # ==================== BADGE ROUTES ====================
 
 @api_router.get("/badges")
