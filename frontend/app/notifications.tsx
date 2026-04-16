@@ -17,6 +17,10 @@ const ICONS: Record<string, { icon: string; color: string }> = {
   friend_accepted: { icon: 'people', color: '#34C759' },
   challenge_invite: { icon: 'flash', color: '#FFD700' },
   challenge_activity: { icon: 'pulse', color: '#AF52DE' },
+  daily_pressure: { icon: 'warning', color: '#FF3B30' },
+  daily_motivation: { icon: 'flame', color: '#FF6B35' },
+  daily_positive: { icon: 'checkmark-circle', color: '#34C759' },
+  social_ranking: { icon: 'podium', color: '#007AFF' },
 };
 
 function timeAgo(date: string) {
@@ -38,9 +42,10 @@ export default function NotificationsScreen() {
 
   const fetchNotifs = useCallback(async () => {
     try {
+      // Generate smart notifications first
+      await api.post('/api/notifications/generate-smart').catch(() => {});
       const data = await api.get('/api/notifications');
       setNotifs(data);
-      // Mark all as read
       api.post('/api/notifications/read').catch(() => {});
     } catch {} finally { setLoading(false); }
   }, []);
@@ -51,7 +56,7 @@ export default function NotificationsScreen() {
   const handlePress = (n: any) => {
     if (n.type === 'friend_request') {
       router.push('/social');
-    } else if (n.type === 'challenge_invite' && n.data?.challenge_id) {
+    } else if (n.data?.challenge_id) {
       router.push(`/challenge/${n.data.challenge_id}`);
     }
   };
@@ -85,23 +90,29 @@ export default function NotificationsScreen() {
           </View>
         ) : (
           notifs.map((n) => {
-            const cfg = ICONS[n.type] || { icon: 'notifications', color: COLORS.primary };
+            const dataIcon = n.data?.icon;
+            const dataColor = n.data?.color;
+            const cfg = dataIcon ? { icon: dataIcon, color: dataColor || COLORS.primary } : (ICONS[n.type] || { icon: 'notifications', color: COLORS.primary });
+            const subText = n.data?.sub;
+            const urgency = n.data?.urgency;
+            const isCritical = urgency === 'critical';
             return (
               <TouchableOpacity
                 key={n.notification_id}
                 testID={`notif-${n.notification_id}`}
                 onPress={() => handlePress(n)}
                 activeOpacity={0.8}
-                style={[s.card, !n.read && s.unread]}
+                style={[s.card, !n.read && s.unread, isCritical && s.cardCrit]}
               >
                 <View style={[s.iconW, { backgroundColor: cfg.color + '18' }]}>
                   <Ionicons name={cfg.icon as any} size={20} color={cfg.color} />
                 </View>
                 <View style={s.body}>
-                  <Text style={s.text}>{n.text}</Text>
+                  <Text style={[s.text, isCritical && { color: cfg.color }]}>{n.text}</Text>
+                  {subText && <Text style={s.sub}>{subText}</Text>}
                   <Text style={s.time}>{timeAgo(n.created_at)}</Text>
                 </View>
-                {!n.read && <View style={s.dot} />}
+                {!n.read && <View style={[s.dot, { backgroundColor: cfg.color }]} />}
               </TouchableOpacity>
             );
           })
@@ -127,9 +138,11 @@ const g = StyleSheet.create({
 const s = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, ...GL, borderRadius: 16, padding: 14, marginBottom: 8 },
   unread: { borderColor: COLORS.primary + '25', backgroundColor: COLORS.primary + '06' },
+  cardCrit: { borderColor: 'rgba(255,59,48,0.3)', backgroundColor: 'rgba(255,59,48,0.06)' },
   iconW: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  body: { flex: 1, gap: 4 },
-  text: { fontSize: 14, fontWeight: '600', color: '#FFF', lineHeight: 19 },
-  time: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
+  body: { flex: 1, gap: 3 },
+  text: { fontSize: 14, fontWeight: '700', color: '#FFF', lineHeight: 19 },
+  sub: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.45)', lineHeight: 17 },
+  time: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted, marginTop: 1 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary },
 });

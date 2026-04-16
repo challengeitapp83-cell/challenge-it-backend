@@ -676,6 +676,162 @@ async def mark_notifications_read(user: User = Depends(get_current_user)):
     )
     return {"message": "Toutes les notifications lues"}
 
+@api_router.post("/notifications/generate-smart")
+async def generate_smart_notifications(user: User = Depends(get_current_user)):
+    """Generate intelligent day-by-day notifications based on user's challenge progress"""
+    import random
+    
+    user_challenges = await db.user_challenges.find(
+        {"user_id": user.user_id, "is_completed": False}, {"_id": 0}
+    ).to_list(20)
+    
+    generated = []
+    
+    for uc in user_challenges:
+        ch = await db.challenges.find_one({"challenge_id": uc["challenge_id"]}, {"_id": 0})
+        if not ch:
+            continue
+        
+        day = uc.get("current_day", 1)
+        total_days = ch.get("duration_days", 7)
+        title = ch.get("title", "Defi")
+        has_pot = ch.get("has_pot", False)
+        pot_total = ch.get("pot_total", 0)
+        
+        # Check if validated today
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_proof = await db.proofs.find_one({
+            "user_id": user.user_id,
+            "challenge_id": uc["challenge_id"],
+            "created_at": {"$gte": today_start}
+        })
+        validated_today = today_proof is not None
+        
+        # Day-specific messages
+        DAY_MESSAGES = {
+            1: [
+                {"text": f"Jour 1 — Ton defi commence maintenant", "sub": "Ne lache pas des le debut", "urgency": "high"},
+                {"text": f"C'est parti ! Premier jour de \"{title}\"", "sub": "Prouve que tu peux tenir", "urgency": "high"},
+            ],
+            2: [
+                {"text": "C'est maintenant que beaucoup abandonnent", "sub": "Jour 2 — Tu continues ou tu laches ?", "urgency": "critical"},
+                {"text": "80% des gens lachent au jour 2", "sub": "Sois dans les 20%", "urgency": "critical"},
+            ],
+            3: [
+                {"text": "Tu es deja devant certains joueurs", "sub": "Jour 3 — Continue comme ca", "urgency": "medium"},
+                {"text": "3 jours de suite, pas mal", "sub": "Mais c'est maintenant que ca se corse", "urgency": "medium"},
+            ],
+            4: [
+                {"text": "La moitie abandonne ici", "sub": "Jour 4 — Toi tu tiens ?", "urgency": "high"},
+            ],
+            5: [
+                {"text": "Tu fais mieux que la majorite", "sub": "Jour 5 — Encore un effort", "urgency": "medium"},
+            ],
+            6: [
+                {"text": "Presque fini !", "sub": "Jour 6 — Ne lache pas maintenant", "urgency": "high"},
+            ],
+            7: [
+                {"text": "DERNIER JOUR", "sub": "C'est maintenant que tu gagnes", "urgency": "critical"},
+            ],
+        }
+        
+        # Not validated yet today - pressure messages
+        if not validated_today:
+            PRESSURE = [
+                {"text": f"Tu vas perdre ton streak !", "sub": f"Valide \"{title}\" avant ce soir", "urgency": "critical", "icon": "warning", "color": "#FF3B30"},
+                {"text": "Plus que quelques heures", "sub": "Tu es en train de decrocher", "urgency": "critical", "icon": "alarm", "color": "#FF3B30"},
+                {"text": f"Jour {day} — Ton defi t'attend", "sub": "C'est aujourd'hui que ca se joue", "urgency": "high", "icon": "flame", "color": "#FF6B35"},
+            ]
+            msg = random.choice(PRESSURE)
+            if has_pot:
+                msg["sub"] = f"{pot_total}€ en jeu — " + msg["sub"]
+            
+            # Don't duplicate: check if similar notif exists today
+            existing = await db.notifications.find_one({
+                "user_id": user.user_id,
+                "type": "daily_pressure",
+                "data.challenge_id": uc["challenge_id"],
+                "created_at": {"$gte": today_start}
+            })
+            if not existing:
+                await _create_notification(user.user_id, "daily_pressure", msg["text"], {
+                    "challenge_id": uc["challenge_id"],
+                    "sub": msg["sub"],
+                    "icon": msg.get("icon", "alarm"),
+                    "color": msg.get("color", "#FF3B30"),
+                    "urgency": msg["urgency"],
+                    "day": day,
+                })
+                generated.append(msg["text"])
+        
+        # Day-specific motivational message
+        day_msgs = DAY_MESSAGES.get(min(day, 7), DAY_MESSAGES[7])
+        day_msg = random.choice(day_msgs)
+        
+        existing_daily = await db.notifications.find_one({
+            "user_id": user.user_id,
+            "type": "daily_motivation",
+            "data.challenge_id": uc["challenge_id"],
+            "created_at": {"$gte": today_start}
+        })
+        if not existing_daily:
+            await _create_notification(user.user_id, "daily_motivation", day_msg["text"], {
+                "challenge_id": uc["challenge_id"],
+                "sub": day_msg["sub"],
+                "icon": "flame",
+                "color": "#FF6B35",
+                "urgency": day_msg["urgency"],
+                "day": day,
+            })
+            generated.append(day_msg["text"])
+        
+        # Validated today - positive reinforcement
+        if validated_today:
+            days_left = total_days - day
+            POSITIVE = [
+                f"Jour {day} valide ! Tu tiens le rythme",
+                f"Bravo ! Encore {days_left} jours pour gagner",
+                f"Tu es en feu ! {day} jours de suite",
+            ]
+            existing_pos = await db.notifications.find_one({
+                "user_id": user.user_id,
+                "type": "daily_positive",
+                "data.challenge_id": uc["challenge_id"],
+                "created_at": {"$gte": today_start}
+            })
+            if not existing_pos:
+                pos_msg = random.choice(POSITIVE)
+                await _create_notification(user.user_id, "daily_positive", pos_msg, {
+                    "challenge_id": uc["challenge_id"],
+                    "icon": "checkmark-circle",
+                    "color": "#34C759",
+                    "urgency": "low",
+                    "day": day,
+                })
+                generated.append(pos_msg)
+    
+    # Social notifications - ranking changes
+    all_users = await db.users.find({}, {"_id": 0}).sort("points", -1).to_list(200)
+    user_rank = next((i + 1 for i, u in enumerate(all_users) if u["user_id"] == user.user_id), len(all_users))
+    
+    if user_rank > 1:
+        above = all_users[user_rank - 2]
+        pts_diff = above.get("points", 0) - user.points
+        if pts_diff < 50:
+            existing_rank = await db.notifications.find_one({
+                "user_id": user.user_id,
+                "type": "social_ranking",
+                "created_at": {"$gte": today_start}
+            })
+            if not existing_rank:
+                await _create_notification(user.user_id, "social_ranking",
+                    f"Tu es #{user_rank}, {above.get('name', 'quelqu un')} est juste devant",
+                    {"icon": "podium", "color": "#007AFF", "urgency": "high", "sub": f"Plus que {pts_diff} pts pour le depasser"}
+                )
+                generated.append(f"Ranking notification")
+    
+    return {"generated": len(generated), "messages": generated}
+
 # ==================== CHALLENGE INVITE ====================
 
 @api_router.post("/challenges/invite")
