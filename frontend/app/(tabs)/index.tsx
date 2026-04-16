@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [trending, setTrending] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
+  const [active, setActive] = useState<any[]>([]);
   const [lb, setLb] = useState<any[]>([]);
   const [pressure, setPressure] = useState<any[]>([]);
   const [rankData, setRankData] = useState<any>(null);
@@ -69,16 +70,17 @@ export default function HomeScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [t, tpl, l, sp, rd, ms, tr2] = await Promise.all([
+      const [t, tpl, ac, l, sp, rd, ms, tr2] = await Promise.all([
         api.get('/api/challenges/trending?limit=8').catch(() => []),
         api.get('/api/challenge-templates').catch(() => []),
+        api.get('/api/my-challenges').catch(() => []),
         api.get('/api/leaderboard?limit=5').catch(() => []),
         api.get('/api/social-pressure').catch(() => []),
         api.get('/api/user-rank').catch(() => null),
         api.get('/api/money-stats').catch(() => null),
         api.get('/api/daily-triggers').catch(() => []),
       ]);
-      setTrending(t); setTemplates(tpl); setLb(l);
+      setTrending(t); setTemplates(tpl); setActive(ac); setLb(l);
       setPressure(sp); setRankData(rd); setMoneyStats(ms); setTriggers(tr2);
     } catch {} finally { setLoading(false); }
   }, []);
@@ -210,6 +212,39 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
             </Animated.View>
+          </Fade>
+        )}
+
+        {/* ===== MES DEFIS EN COURS ===== */}
+        {active.length > 0 && (
+          <Fade delay={215}>
+            <View style={sec.w}>
+              <View style={sec.h}>
+                <View style={sec.hL}><Ionicons name="flag" size={18} color="#00D4FF" /><Text style={sec.t}>Mes defis en cours</Text></View>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/challenges')}><Text style={sec.l}>Tout</Text></TouchableOpacity>
+              </View>
+              {active.slice(0, 3).map((uc: any) => {
+                const ch = uc.challenge;
+                const pct = ch?.duration_days ? Math.round(((uc.completed_days || 0) / ch.duration_days) * 100) : 0;
+                const cat = CATEGORIES[ch?.category] || CATEGORIES['Autre'];
+                return (
+                  <TouchableOpacity key={uc.user_challenge_id} onPress={() => router.push(`/challenge/${ch?.challenge_id}`)} activeOpacity={0.85} style={ac.card}>
+                    <View style={[ac.catDot, { backgroundColor: cat.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={ac.title} numberOfLines={1}>{ch?.title}</Text>
+                      <View style={ac.meta}>
+                        <Text style={ac.day}>Jour {uc.current_day || 1}/{ch?.duration_days}</Text>
+                        {ch?.has_pot && <><Ionicons name="cash" size={11} color="#FFD700" /><Text style={ac.pot}>{ch.pot_total}€</Text></>}
+                      </View>
+                    </View>
+                    <View style={ac.pctW}>
+                      <Text style={[ac.pctT, pct >= 50 && { color: '#34C759' }]}>{pct}%</Text>
+                    </View>
+                    <View style={ac.barBg}><View style={[ac.barFill, { width: `${Math.max(pct, 3)}%` as any }]} /></View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </Fade>
         )}
 
@@ -467,6 +502,19 @@ const tr = StyleSheet.create({
   sub: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.45)', marginTop: 3 },
   pot: { fontSize: 12, fontWeight: '700', color: '#FFD700', marginTop: 3 },
   arrowW: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,59,48,0.12)', justifyContent: 'center', alignItems: 'center' },
+});
+
+const ac = StyleSheet.create({
+  card: { marginHorizontal: 20, ...GL, borderRadius: 16, padding: 14, marginBottom: 8, position: 'relative', overflow: 'hidden' },
+  catDot: { width: 4, height: 36, borderRadius: 2, position: 'absolute', left: 0, top: 18 },
+  title: { fontSize: 15, fontWeight: '700', color: '#FFF', marginLeft: 8 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8, marginTop: 4 },
+  day: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+  pot: { fontSize: 12, fontWeight: '700', color: '#FFD700' },
+  pctW: { position: 'absolute', right: 14, top: 14 },
+  pctT: { fontSize: 16, fontWeight: '900', color: 'rgba(255,255,255,0.5)' },
+  barBg: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.05)' },
+  barFill: { height: '100%', backgroundColor: '#00D4FF' },
 });
 
 const st = StyleSheet.create({

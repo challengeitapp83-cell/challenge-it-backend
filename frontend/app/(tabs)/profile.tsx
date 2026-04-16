@@ -54,14 +54,24 @@ export default function ProfileScreen() {
         {/* ===== PROFILE HEADER ===== */}
         <Fade>
           <View style={hd.w}>
+            {/* Settings button */}
+            <TouchableOpacity onPress={() => router.push('/settings')} style={hd.settingsBtn}>
+              <Ionicons name="settings-outline" size={22} color="rgba(255,255,255,0.5)" />
+            </TouchableOpacity>
             <View style={hd.avWrap}>
               {user?.picture ? <Image source={{ uri: user.picture }} style={hd.av} /> :
-                <LinearGradient colors={['#007AFF', '#9D4CDD']} style={hd.av}><Text style={hd.avI}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text></LinearGradient>}
+                <LinearGradient colors={['#00D4FF', '#C850C0']} style={hd.av}><Text style={hd.avI}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text></LinearGradient>}
               <View style={hd.lvl}><Text style={hd.lvlN}>{user?.level || 1}</Text></View>
             </View>
             <Text style={hd.name}>{user?.name || 'Challenger'}</Text>
             <Text style={hd.email}>{user?.email}</Text>
-            {user?.bio ? <Text style={hd.bio}>{user.bio}</Text> : null}
+            {/* Win rate */}
+            {stats && (stats.challenges_won || 0) + (stats.challenges_lost || 0) > 0 && (
+              <View style={hd.winRate}>
+                <Text style={hd.winRateVal}>{Math.round(((stats.challenges_won || 0) / ((stats.challenges_won || 0) + (stats.challenges_lost || 0))) * 100)}%</Text>
+                <Text style={hd.winRateLbl}>taux de reussite</Text>
+              </View>
+            )}
             {/* XP Bar */}
             <View style={hd.xpW}>
               <View style={hd.xpRow}>
@@ -199,18 +209,21 @@ const GL = { backgroundColor: 'rgba(22,22,36,0.5)', borderWidth: 1, borderColor:
 const g = StyleSheet.create({ root: { flex: 1, backgroundColor: '#0F0F0F' }, bg: { position: 'absolute', top: 0, left: 0, right: 0, height: 300, width: '100%' }, ov: { position: 'absolute', top: 0, left: 0, right: 0, height: 300 } });
 
 const hd = StyleSheet.create({
-  w: { alignItems: 'center', paddingTop: 24, paddingBottom: 16, paddingHorizontal: 20 },
+  w: { alignItems: 'center', paddingTop: 24, paddingBottom: 16, paddingHorizontal: 20, position: 'relative' },
+  settingsBtn: { position: 'absolute', top: 24, right: 20, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(25,30,60,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   avWrap: { position: 'relative', marginBottom: 14 },
-  av: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.primary },
+  av: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#00D4FF' },
   avI: { fontSize: 36, fontWeight: '800', color: '#FFF' },
-  lvl: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.primary, borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#0F0F0F' },
+  lvl: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#00D4FF', borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#0F0F0F' },
   lvlN: { fontSize: 12, fontWeight: '900', color: '#FFF' },
   name: { fontSize: 24, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
   email: { fontSize: 13, color: COLORS.textMuted, marginTop: 3 },
-  bio: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
+  winRate: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: 'rgba(52,199,89,0.1)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(52,199,89,0.15)' },
+  winRateVal: { fontSize: 18, fontWeight: '900', color: '#34C759' },
+  winRateLbl: { fontSize: 12, fontWeight: '600', color: 'rgba(52,199,89,0.7)' },
   xpW: { ...GL, borderRadius: 14, padding: 12, marginTop: 16, width: '100%' },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  xpLbl: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  xpLbl: { fontSize: 12, fontWeight: '700', color: '#00D4FF' },
   xpVal: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
   xpBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
   xpFill: { height: '100%', borderRadius: 3 },
