@@ -235,9 +235,11 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Major addiction engine update. New backend endpoints added: /api/social-pressure (dynamic social pressure messages), /api/user-rank (user ranking with rivals), /api/daily-triggers (personalized triggers), /api/money-stats (total pots in play). Updated seed data with pot amounts. Frontend home screen completely redesigned with money banner, social pressure feed, ranking widget. Challenge detail now has 'Miser' button linking to bet screen. Test all new endpoints work correctly."
+    message: "Social system implemented. New endpoints: POST /api/friends/request (send friend request), GET /api/friends/requests (pending requests), POST /api/friends/accept/{id}, POST /api/friends/decline/{id}, GET /api/friends/requests/sent, GET /api/notifications, GET /api/notifications/unread-count, POST /api/notifications/read, POST /api/challenges/invite, POST /api/challenges/create-and-invite. Search users now returns friendship status. New frontend screens: /social (search+requests+friends), /notifications, /challenge-friend (quick challenge flow). Test the social flow: search user, send friend request, accept request, invite to challenge."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE - All addiction engine endpoints PASSED. /api/money-stats (NO AUTH): Returns 18,400 total in play, 6 active pots, biggest pot 11,700. /api/social-pressure (AUTH): Returns 5 personalized messages with correct structure. /api/user-rank (AUTH): Returns rank 10/17 with 5 nearby rivals. /api/daily-triggers (AUTH): Returns personalized triggers. All endpoints handle auth correctly (401 for invalid tokens). Existing endpoints (/api/challenges, /api/leaderboard) working. Challenges include pot data (has_pot, pot_total, pot_amount_per_person). 100% test success rate (12/12 tests passed)."
+  - agent: "testing"
+    message: "✅ SOCIAL SYSTEM TESTING COMPLETE - All social system endpoints PASSED. Fixed critical route ordering issue with /api/users/search (moved before /users/{user_id}). User search returns 2 users matching 'Alex' with correct friendship status. Friend request system working: can send requests, get pending/sent requests. Notifications system working: get notifications, unread count, mark as read. Challenge creation and invitation working with invite codes. Friends list includes badges field. All endpoints require proper auth (401 for invalid tokens). 100% test success rate (16/16 tests passed)."
 
 backend:
   - task: "Social pressure endpoint /api/social-pressure"
@@ -299,6 +301,66 @@ backend:
       - working: true
         agent: "main"
         comment: "POST /api/seed - seeds 5 demo challenges"
+
+  - task: "User search endpoint /api/users/search"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Fixed route ordering issue (moved before /users/{user_id}). Returns users matching search query with correct structure (user_id, name, picture, level, points, badges, is_friend, request_sent). Found 2 users matching 'Alex'. Auth required."
+
+  - task: "Friend request system endpoints"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - POST /api/friends/request: Successfully sends friend requests with request_id. GET /api/friends/requests: Returns pending requests with correct structure. GET /api/friends/requests/sent: Returns array of user IDs. All endpoints require auth and handle invalid tokens correctly."
+
+  - task: "Notifications system endpoints"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/notifications: Returns notifications with correct structure (notification_id, type, text, read, created_at). GET /api/notifications/unread-count: Returns count object. POST /api/notifications/read: Marks all as read. All endpoints require auth."
+
+  - task: "Challenge creation and invitation endpoint"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - POST /api/challenges/create-and-invite: Creates challenge and invites user. Returns challenge object with invite_code and challenge_id. Successfully created 'Test Defi' challenge with invite code. Auth required."
+
+  - task: "Friends list endpoint /api/friends"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Returns friends list with correct structure including badges field (user_id, name, picture, level, points, streak, badges). Empty array for test user as expected. Auth required."
 
 #====================================================================================================
 # END - Testing Protocol

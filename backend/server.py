@@ -293,6 +293,30 @@ async def get_user_profile(user: User = Depends(get_current_user)):
     """Get current user's full profile"""
     return user.dict()
 
+@api_router.get("/users/search")
+async def search_users(q: str, user: User = Depends(get_current_user)):
+    """Search users by name"""
+    if len(q) < 1:
+        return []
+    users = await db.users.find(
+        {"name": {"$regex": q, "$options": "i"}, "user_id": {"$ne": user.user_id}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "badges": 1, "streak": 1}
+    ).limit(15).to_list(15)
+    
+    # Add friendship status
+    user_friends = user.friends or []
+    sent_requests = await db.friend_requests.find(
+        {"from_id": user.user_id, "status": "pending"},
+        {"_id": 0, "to_id": 1}
+    ).to_list(100)
+    sent_ids = [r["to_id"] for r in sent_requests]
+    
+    for u in users:
+        u["is_friend"] = u["user_id"] in user_friends
+        u["request_sent"] = u["user_id"] in sent_ids
+    
+    return users
+
 @api_router.get("/users/{user_id}")
 async def get_user(user_id: str):
     """Get a user's public profile"""
@@ -389,17 +413,6 @@ async def get_challenge(challenge_id: str):
 
 # ==================== SOCIAL / INVITE ROUTES ====================
 
-@api_router.get("/users/search")
-async def search_users(q: str, user: User = Depends(get_current_user)):
-    """Search users by name"""
-    if len(q) < 2:
-        return []
-    users = await db.users.find(
-        {"name": {"$regex": q, "$options": "i"}, "user_id": {"$ne": user.user_id}},
-        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1}
-    ).limit(10).to_list(10)
-    return users
-
 @api_router.get("/challenges/code/{invite_code}")
 async def get_challenge_by_code(invite_code: str):
     """Get challenge by invite code"""
@@ -483,11 +496,104 @@ async def get_my_friends_challenges(user: User = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(50)
     return challenges
 
-# ==================== FRIEND SYSTEM ====================
+# ==================== FRIEND SYSTEM (REQUEST-BASED) ====================
+
+@api_router.post("/friends/request")
+async def send_friend_request(request: Request, user: User = Depends(get_current_user)):
+    """Send a friend request"""
+    body = await request.json()
+    to_id = body.get("to_id")
+    if not to_id or to_id == user.user_id:
+        raise HTTPException(status_code=400, detail="ID invalide")
+    
+    target = await db.users.find_one({"user_id": to_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    
+    # Already friends?
+    if to_id in (user.friends or []):
+        raise HTTPException(status_code=400, detail="Deja ami")
+    
+    # Existing pending request?
+    existing = await db.friend_requests.find_one({
+        "$or": [
+            {"from_id": user.user_id, "to_id": to_id, "status": "pending"},
+            {"from_id": to_id, "to_id": user.user_id, "status": "pending"},
+        ]
+    })
+    if existing:
+        # If they already sent us a request, auto-accept
+        if existing["from_id"] == to_id:
+            await db.friend_requests.update_one(
+                {"request_id": existing["request_id"]},
+                {"$set": {"status": "accepted"}}
+            )
+            await db.users.update_one({"user_id": user.user_id}, {"$addToSet": {"friends": to_id}})
+            await db.users.update_one({"user_id": to_id}, {"$addToSet": {"friends": user.user_id}})
+            await _create_notification(to_id, "friend_accepted", f"{user.name} a accepte ta demande", {"user_id": user.user_id})
+            return {"message": "Vous etes maintenant amis !", "status": "accepted"}
+        raise HTTPException(status_code=400, detail="Demande deja envoyee")
+    
+    req_id = f"freq_{uuid.uuid4().hex[:12]}"
+    await db.friend_requests.insert_one({
+        "request_id": req_id,
+        "from_id": user.user_id,
+        "from_name": user.name,
+        "from_picture": user.picture,
+        "to_id": to_id,
+        "to_name": target.get("name", ""),
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc),
+    })
+    
+    await _create_notification(to_id, "friend_request", f"{user.name} veut etre ton ami", {"user_id": user.user_id, "request_id": req_id})
+    return {"message": f"Demande envoyee a {target.get('name')}", "request_id": req_id}
+
+@api_router.get("/friends/requests")
+async def get_friend_requests(user: User = Depends(get_current_user)):
+    """Get pending friend requests received"""
+    requests = await db.friend_requests.find(
+        {"to_id": user.user_id, "status": "pending"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return requests
+
+@api_router.get("/friends/requests/sent")
+async def get_sent_requests(user: User = Depends(get_current_user)):
+    """Get friend requests sent by user"""
+    requests = await db.friend_requests.find(
+        {"from_id": user.user_id, "status": "pending"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return [r["to_id"] for r in requests]
+
+@api_router.post("/friends/accept/{request_id}")
+async def accept_friend_request(request_id: str, user: User = Depends(get_current_user)):
+    """Accept a friend request"""
+    req = await db.friend_requests.find_one({"request_id": request_id, "to_id": user.user_id, "status": "pending"}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    
+    await db.friend_requests.update_one({"request_id": request_id}, {"$set": {"status": "accepted"}})
+    await db.users.update_one({"user_id": user.user_id}, {"$addToSet": {"friends": req["from_id"]}})
+    await db.users.update_one({"user_id": req["from_id"]}, {"$addToSet": {"friends": user.user_id}})
+    
+    await _create_notification(req["from_id"], "friend_accepted", f"{user.name} a accepte ta demande", {"user_id": user.user_id})
+    return {"message": f"Vous etes maintenant amis avec {req.get('from_name', '')}"}
+
+@api_router.post("/friends/decline/{request_id}")
+async def decline_friend_request(request_id: str, user: User = Depends(get_current_user)):
+    """Decline a friend request"""
+    req = await db.friend_requests.find_one({"request_id": request_id, "to_id": user.user_id, "status": "pending"}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    
+    await db.friend_requests.update_one({"request_id": request_id}, {"$set": {"status": "declined"}})
+    return {"message": "Demande refusee"}
 
 @api_router.post("/friends/add")
 async def add_friend(request: Request, user: User = Depends(get_current_user)):
-    """Add a friend by user_id"""
+    """Legacy: Add a friend directly (kept for backward compat, now sends request)"""
     body = await request.json()
     friend_id = body.get("friend_id")
     if not friend_id or friend_id == user.user_id:
@@ -498,12 +604,12 @@ async def add_friend(request: Request, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     
     if friend_id in (user.friends or []):
-        raise HTTPException(status_code=400, detail="Déjà ami")
+        raise HTTPException(status_code=400, detail="Deja ami")
     
     # Add mutual friendship
     await db.users.update_one({"user_id": user.user_id}, {"$addToSet": {"friends": friend_id}})
     await db.users.update_one({"user_id": friend_id}, {"$addToSet": {"friends": user.user_id}})
-    return {"message": f"Ami ajouté : {friend.get('name')}"}
+    return {"message": f"Ami ajoute : {friend.get('name')}"}
 
 @api_router.get("/friends")
 async def get_friends(user: User = Depends(get_current_user)):
@@ -513,7 +619,7 @@ async def get_friends(user: User = Depends(get_current_user)):
         return []
     friends = await db.users.find(
         {"user_id": {"$in": friend_ids}},
-        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "streak": 1}
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "streak": 1, "badges": 1}
     ).to_list(100)
     return friends
 
@@ -526,6 +632,119 @@ async def get_friends_leaderboard(user: User = Depends(get_current_user)):
         {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "streak": 1}
     ).sort("points", -1).to_list(50)
     return friends
+
+# ==================== NOTIFICATIONS ====================
+
+async def _create_notification(user_id: str, ntype: str, text: str, data: dict = None):
+    """Helper to create a notification"""
+    notif = {
+        "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
+        "user_id": user_id,
+        "type": ntype,
+        "text": text,
+        "data": data or {},
+        "read": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    await db.notifications.insert_one(notif)
+
+@api_router.get("/notifications")
+async def get_notifications(user: User = Depends(get_current_user)):
+    """Get user's notifications"""
+    notifs = await db.notifications.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    return notifs
+
+@api_router.get("/notifications/unread-count")
+async def get_unread_count(user: User = Depends(get_current_user)):
+    """Get count of unread notifications"""
+    count = await db.notifications.count_documents({"user_id": user.user_id, "read": False})
+    return {"count": count}
+
+@api_router.post("/notifications/read")
+async def mark_notifications_read(user: User = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    await db.notifications.update_many(
+        {"user_id": user.user_id, "read": False},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Toutes les notifications lues"}
+
+# ==================== CHALLENGE INVITE ====================
+
+@api_router.post("/challenges/invite")
+async def invite_to_challenge(request: Request, user: User = Depends(get_current_user)):
+    """Invite a user to a challenge"""
+    body = await request.json()
+    challenge_id = body.get("challenge_id")
+    invited_id = body.get("user_id")
+    
+    if not challenge_id or not invited_id:
+        raise HTTPException(status_code=400, detail="challenge_id et user_id requis")
+    
+    challenge = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Defi introuvable")
+    
+    invited = await db.users.find_one({"user_id": invited_id}, {"_id": 0})
+    if not invited:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    
+    await _create_notification(
+        invited_id,
+        "challenge_invite",
+        f"{user.name} te defie : {challenge.get('title', '')}",
+        {"challenge_id": challenge_id, "from_user_id": user.user_id, "invite_code": challenge.get("invite_code", "")}
+    )
+    return {"message": f"Invitation envoyee a {invited.get('name', '')}"}
+
+@api_router.post("/challenges/create-and-invite")
+async def create_and_invite(request: Request, user: User = Depends(get_current_user)):
+    """Create a challenge and invite a specific user"""
+    body = await request.json()
+    invited_id = body.get("invited_user_id")
+    
+    invite_code = generate_invite_code()
+    challenge = Challenge(
+        title=body.get("title", "Defi entre amis"),
+        description=body.get("description", ""),
+        category=body.get("category", "General"),
+        duration_days=body.get("duration_days", 7),
+        difficulty=body.get("difficulty", "moyen"),
+        validation_type="manual",
+        is_public=False,
+        challenge_type="friends",
+        invite_code=invite_code,
+        creator_id=user.user_id,
+        creator_name=user.name,
+        participants=[user.user_id],
+        participant_count=1,
+        has_pot=body.get("has_pot", False),
+        pot_amount_per_person=body.get("pot_amount", 0),
+        image=body.get("image"),
+    )
+    await db.challenges.insert_one(challenge.dict())
+    
+    # Auto-join creator
+    uc = UserChallenge(user_id=user.user_id, challenge_id=challenge.challenge_id)
+    await db.user_challenges.insert_one(uc.dict())
+    await db.users.update_one({"user_id": user.user_id}, {"$push": {"joined_challenges": challenge.challenge_id}})
+    
+    # Invite the target user
+    if invited_id:
+        invited = await db.users.find_one({"user_id": invited_id}, {"_id": 0})
+        if invited:
+            await _create_notification(
+                invited_id,
+                "challenge_invite",
+                f"{user.name} te defie : {challenge.title}",
+                {"challenge_id": challenge.challenge_id, "from_user_id": user.user_id, "invite_code": invite_code}
+            )
+    
+    await update_user_points(user.user_id, 5)
+    return {**challenge.dict(), "invite_code": invite_code}
 
 @api_router.put("/users/me/bio")
 async def update_bio(request: Request, user: User = Depends(get_current_user)):

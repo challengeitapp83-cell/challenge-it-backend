@@ -133,7 +133,7 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
-              <TouchableOpacity testID="notifications-btn" style={hero.notif}>
+              <TouchableOpacity testID="notifications-btn" style={hero.notif} onPress={() => router.push('/notifications')}>
                 <Ionicons name="notifications" size={20} color="#FFF" />
                 {pressure.length > 0 && <View style={hero.notifDot} />}
               </TouchableOpacity>

@@ -121,18 +121,32 @@ export default function ProfileScreen() {
         {/* ===== FRIENDS ===== */}
         <Fade delay={220}>
           <View style={sec.w}>
-            <View style={sec.hRow}><Text style={sec.t}>Amis ({friends.length})</Text></View>
+            <View style={sec.hRow}>
+              <Text style={sec.t}>Amis ({friends.length})</Text>
+              <TouchableOpacity testID="open-social-btn" onPress={() => router.push('/social')}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.primary }}>Social</Text>
+              </TouchableOpacity>
+            </View>
             {friends.length === 0 ? (
-              <View style={fr.empty}><Ionicons name="people-outline" size={28} color={COLORS.textMuted} /><Text style={fr.emptyT}>Invite tes amis à relever des défis !</Text></View>
+              <TouchableOpacity onPress={() => router.push('/social')} activeOpacity={0.85}>
+                <View style={fr.empty}>
+                  <Ionicons name="people-outline" size={28} color={COLORS.textMuted} />
+                  <Text style={fr.emptyT}>Invite tes amis a relever des defis !</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, backgroundColor: COLORS.primary + '15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}>
+                    <Ionicons name="search" size={14} color={COLORS.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.primary }}>Trouver des joueurs</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
                 {friends.map((f: any) => (
-                  <View key={f.user_id} style={fr.card}>
+                  <TouchableOpacity key={f.user_id} onPress={() => router.push({ pathname: '/challenge-friend', params: { targetId: f.user_id, targetName: f.name, targetPicture: f.picture || '' } })} style={fr.card} activeOpacity={0.8}>
                     {f.picture ? <Image source={{ uri: f.picture }} style={fr.av} /> :
                       <LinearGradient colors={['#007AFF', '#9D4CDD']} style={fr.av}><Text style={fr.avI}>{f.name?.charAt(0)}</Text></LinearGradient>}
                     <Text style={fr.name} numberOfLines={1}>{f.name?.split(' ')[0]}</Text>
                     <Text style={fr.pts}>{f.points} pts</Text>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             )}

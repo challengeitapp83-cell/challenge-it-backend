@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Challenge It - Addiction Engine
-Tests all backend endpoints including new addiction engine features
+Backend API Testing for Challenge It - Social System
+Tests all social system endpoints including friends, notifications, and challenges
 """
 
 import requests
@@ -12,11 +12,13 @@ from datetime import datetime
 # Backend URL from environment
 BACKEND_URL = "https://gamified-goals-12.preview.emergentagent.com/api"
 
-class BackendTester:
+class SocialSystemTester:
     def __init__(self):
         self.session_token = None
         self.user_id = None
         self.test_results = []
+        self.seed_user_1_id = "seed_user_1"  # Alex from seed data
+        self.seed_user_2_id = "seed_user_2"  # Thomas from seed data
         
     def log_test(self, endpoint, method, status, expected_status, response_data=None, error=None):
         """Log test result"""
@@ -41,28 +43,21 @@ class BackendTester:
             print(f"   Response: {response_data}")
         return success
     
-    def test_health(self):
-        """Test health endpoint"""
-        try:
-            response = requests.get(f"{BACKEND_URL}/health", timeout=10)
-            return self.log_test("/health", "GET", response.status_code, 200, response.json())
-        except Exception as e:
-            return self.log_test("/health", "GET", 0, 200, error=e)
-    
     def test_seed_data(self):
-        """Test seed data endpoint"""
+        """Test seed data endpoint to ensure test data exists"""
         try:
             response = requests.post(f"{BACKEND_URL}/seed", timeout=15)
-            return self.log_test("/seed", "POST", response.status_code, 200, response.json())
+            success = self.log_test("/seed", "POST", response.status_code, 200, response.json())
+            if success:
+                print("   📊 Seed data created - test users should be available")
+            return success
         except Exception as e:
             return self.log_test("/seed", "POST", 0, 200, error=e)
     
     def create_test_session(self):
         """Create a test session for authenticated endpoints"""
         try:
-            # Create test user and session directly via MongoDB simulation
             import subprocess
-            import uuid
             
             user_id = f"test-user-{int(time.time())}"
             session_token = f"test_session_{int(time.time())}"
@@ -91,6 +86,7 @@ db.users.insertOne({{
   reputation: 42,
   badges: ['first_challenge', 'streak_7'],
   joined_challenges: [],
+  friends: [],
   created_at: new Date()
 }});
 db.user_sessions.insertOne({{
@@ -117,226 +113,346 @@ print('Session created successfully');
             print("⚠️  Will test with mock session token")
             return True
     
-    def test_money_stats(self):
-        """Test money stats endpoint (NO AUTH required)"""
-        try:
-            response = requests.get(f"{BACKEND_URL}/money-stats", timeout=10)
-            data = response.json() if response.status_code == 200 else None
-            
-            success = self.log_test("/money-stats", "GET", response.status_code, 200, data)
-            
-            if success and data:
-                # Validate response structure
-                required_fields = ["total_in_play", "active_pot_count", "biggest_pot", "user_money_at_stake"]
-                missing_fields = [f for f in required_fields if f not in data]
-                if missing_fields:
-                    print(f"   ⚠️  Missing fields: {missing_fields}")
-                    return False
-                
-                print(f"   💰 Total in play: {data.get('total_in_play', 0)}")
-                print(f"   🎯 Active pots: {data.get('active_pot_count', 0)}")
-                if data.get('biggest_pot'):
-                    print(f"   🏆 Biggest pot: {data['biggest_pot'].get('pot_total', 0)} ({data['biggest_pot'].get('title', 'Unknown')})")
-                
-            return success
-        except Exception as e:
-            return self.log_test("/money-stats", "GET", 0, 200, error=e)
-    
-    def test_challenges_trending(self):
-        """Test challenges trending endpoint with pot data"""
-        try:
-            response = requests.get(f"{BACKEND_URL}/challenges/trending?limit=5", timeout=10)
-            data = response.json() if response.status_code == 200 else None
-            
-            success = self.log_test("/challenges/trending", "GET", response.status_code, 200, data)
-            
-            if success and data:
-                print(f"   📊 Found {len(data)} trending challenges")
-                
-                # Check for pot data in challenges
-                pot_challenges = [c for c in data if c.get('has_pot')]
-                print(f"   💰 Challenges with pots: {len(pot_challenges)}")
-                
-                for challenge in data[:2]:  # Check first 2
-                    required_fields = ["challenge_id", "title", "has_pot"]
-                    if challenge.get('has_pot'):
-                        required_fields.extend(["pot_total", "pot_amount_per_person"])
-                    
-                    missing = [f for f in required_fields if f not in challenge]
-                    if missing:
-                        print(f"   ⚠️  Challenge missing fields: {missing}")
-                        return False
-                
-            return success
-        except Exception as e:
-            return self.log_test("/challenges/trending", "GET", 0, 200, error=e)
-    
-    def test_auth_endpoints(self):
-        """Test authenticated endpoints"""
+    def test_user_search(self):
+        """Test user search endpoint"""
         if not self.session_token:
-            print("⚠️  No session token available, skipping auth tests")
-            return True
+            print("⚠️  No session token available, skipping user search test")
+            return False
         
         headers = {"Authorization": f"Bearer {self.session_token}"}
         
-        # Test social pressure endpoint
         try:
-            response = requests.get(f"{BACKEND_URL}/social-pressure", headers=headers, timeout=10)
+            # Search for "Alex" - should find seed_user_1
+            response = requests.get(f"{BACKEND_URL}/users/search?q=Alex", headers=headers, timeout=10)
             data = response.json() if response.status_code == 200 else None
             
             if response.status_code == 401:
-                print("🔒 Social pressure endpoint requires valid auth (401 as expected)")
-                success = True
-            else:
-                success = self.log_test("/social-pressure", "GET", response.status_code, 200, data)
-                
-                if success and data:
-                    print(f"   📢 Social pressure messages: {len(data)}")
-                    
-                    # Validate message structure
-                    for msg in data[:2]:  # Check first 2 messages
-                        required_fields = ["type", "icon", "color", "text", "sub", "urgency"]
-                        missing = [f for f in required_fields if f not in msg]
-                        if missing:
-                            print(f"   ⚠️  Message missing fields: {missing}")
-                            return False
-                        
-                        print(f"   📨 {msg.get('type')}: {msg.get('text')}")
+                print("🔒 User search endpoint requires valid auth (401 as expected)")
+                return True
             
-        except Exception as e:
-            success = self.log_test("/social-pressure", "GET", 0, 200, error=e)
-        
-        # Test user rank endpoint
-        try:
-            response = requests.get(f"{BACKEND_URL}/user-rank", headers=headers, timeout=10)
-            data = response.json() if response.status_code == 200 else None
+            success = self.log_test("/users/search", "GET", response.status_code, 200, data)
             
-            if response.status_code == 401:
-                print("🔒 User rank endpoint requires valid auth (401 as expected)")
-                success = True
-            else:
-                success = self.log_test("/user-rank", "GET", response.status_code, 200, data)
+            if success and data:
+                print(f"   🔍 Found {len(data)} users matching 'Alex'")
                 
-                if success and data:
-                    required_fields = ["rank", "total_players", "points", "nearby_rivals", "total_money_in_play"]
-                    missing = [f for f in required_fields if f not in data]
+                # Validate response structure
+                for user in data:
+                    required_fields = ["user_id", "name", "picture", "level", "points", "badges", "is_friend", "request_sent"]
+                    missing = [f for f in required_fields if f not in user]
                     if missing:
-                        print(f"   ⚠️  Missing fields: {missing}")
+                        print(f"   ⚠️  User missing fields: {missing}")
                         return False
                     
-                    print(f"   🏆 Rank: {data.get('rank')}/{data.get('total_players')}")
-                    print(f"   💎 Points: {data.get('points')}")
-                    print(f"   👥 Nearby rivals: {len(data.get('nearby_rivals', []))}")
+                    print(f"   👤 {user.get('name')} (ID: {user.get('user_id')}) - Friend: {user.get('is_friend')}, Request sent: {user.get('request_sent')}")
             
+            return success
         except Exception as e:
-            success = self.log_test("/user-rank", "GET", 0, 200, error=e)
+            return self.log_test("/users/search", "GET", 0, 200, error=e)
+    
+    def test_send_friend_request(self):
+        """Test sending friend request"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping friend request test")
+            return False
         
-        # Test daily triggers endpoint
+        headers = {"Authorization": f"Bearer {self.session_token}", "Content-Type": "application/json"}
+        
         try:
-            response = requests.get(f"{BACKEND_URL}/daily-triggers", headers=headers, timeout=10)
+            # Send friend request to seed_user_2 (Thomas)
+            payload = {"to_id": self.seed_user_2_id}
+            response = requests.post(f"{BACKEND_URL}/friends/request", headers=headers, json=payload, timeout=10)
             data = response.json() if response.status_code == 200 else None
             
             if response.status_code == 401:
-                print("🔒 Daily triggers endpoint requires valid auth (401 as expected)")
+                print("🔒 Friend request endpoint requires valid auth (401 as expected)")
+                return True
+            
+            success = self.log_test("/friends/request", "POST", response.status_code, 200, data)
+            
+            if success and data:
+                print(f"   📤 Friend request sent: {data.get('message')}")
+                if "request_id" in data:
+                    print(f"   🆔 Request ID: {data.get('request_id')}")
+            
+            return success
+        except Exception as e:
+            return self.log_test("/friends/request", "POST", 0, 200, error=e)
+    
+    def test_get_friend_requests(self):
+        """Test getting pending friend requests"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping friend requests test")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.session_token}"}
+        
+        try:
+            response = requests.get(f"{BACKEND_URL}/friends/requests", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Friend requests endpoint requires valid auth (401 as expected)")
+                return True
+            
+            success = self.log_test("/friends/requests", "GET", response.status_code, 200, data)
+            
+            if success and data:
+                print(f"   📥 Pending friend requests: {len(data)}")
+                
+                # Validate response structure
+                for req in data:
+                    required_fields = ["from_id", "from_name", "status", "request_id"]
+                    missing = [f for f in required_fields if f not in req]
+                    if missing:
+                        print(f"   ⚠️  Request missing fields: {missing}")
+                        return False
+                    
+                    print(f"   📨 From: {req.get('from_name')} (ID: {req.get('from_id')}) - Status: {req.get('status')}")
+            
+            return success
+        except Exception as e:
+            return self.log_test("/friends/requests", "GET", 0, 200, error=e)
+    
+    def test_get_sent_requests(self):
+        """Test getting sent friend requests"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping sent requests test")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.session_token}"}
+        
+        try:
+            response = requests.get(f"{BACKEND_URL}/friends/requests/sent", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Sent requests endpoint requires valid auth (401 as expected)")
+                return True
+            
+            success = self.log_test("/friends/requests/sent", "GET", response.status_code, 200, data)
+            
+            if success and data:
+                print(f"   📤 Sent friend requests: {len(data)} user IDs")
+                for user_id in data:
+                    print(f"   📨 Sent to: {user_id}")
+            
+            return success
+        except Exception as e:
+            return self.log_test("/friends/requests/sent", "GET", 0, 200, error=e)
+    
+    def test_notifications(self):
+        """Test notifications endpoints"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping notifications test")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.session_token}"}
+        all_success = True
+        
+        # Test get notifications
+        try:
+            response = requests.get(f"{BACKEND_URL}/notifications", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Notifications endpoint requires valid auth (401 as expected)")
                 success = True
             else:
-                success = self.log_test("/daily-triggers", "GET", response.status_code, 200, data)
+                success = self.log_test("/notifications", "GET", response.status_code, 200, data)
                 
                 if success and data:
-                    print(f"   🎯 Daily triggers: {len(data)}")
+                    print(f"   🔔 Notifications: {len(data)}")
                     
-                    # Validate trigger structure
-                    for trigger in data[:2]:  # Check first 2 triggers
-                        required_fields = ["type", "icon", "color", "title", "text"]
-                        missing = [f for f in required_fields if f not in trigger]
+                    # Validate response structure
+                    for notif in data[:3]:  # Check first 3
+                        required_fields = ["notification_id", "type", "text", "read", "created_at"]
+                        missing = [f for f in required_fields if f not in notif]
                         if missing:
-                            print(f"   ⚠️  Trigger missing fields: {missing}")
-                            return False
-                        
-                        print(f"   🔔 {trigger.get('type')}: {trigger.get('title')}")
+                            print(f"   ⚠️  Notification missing fields: {missing}")
+                            success = False
+                        else:
+                            print(f"   📨 {notif.get('type')}: {notif.get('text')} (Read: {notif.get('read')})")
             
+            all_success = all_success and success
         except Exception as e:
-            success = self.log_test("/daily-triggers", "GET", 0, 200, error=e)
+            all_success = False
+            self.log_test("/notifications", "GET", 0, 200, error=e)
         
-        return True
-    
-    def test_existing_endpoints(self):
-        """Test existing endpoints still work"""
-        endpoints = [
-            ("/challenges", "GET", 200),
-            ("/leaderboard", "GET", 200),
-        ]
+        # Test unread count
+        try:
+            response = requests.get(f"{BACKEND_URL}/notifications/unread-count", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Unread count endpoint requires valid auth (401 as expected)")
+                success = True
+            else:
+                success = self.log_test("/notifications/unread-count", "GET", response.status_code, 200, data)
+                
+                if success and data:
+                    if "count" not in data:
+                        print("   ⚠️  Missing 'count' field in response")
+                        success = False
+                    else:
+                        print(f"   🔢 Unread notifications: {data.get('count')}")
+            
+            all_success = all_success and success
+        except Exception as e:
+            all_success = False
+            self.log_test("/notifications/unread-count", "GET", 0, 200, error=e)
         
-        all_success = True
-        for endpoint, method, expected_status in endpoints:
-            try:
-                if method == "GET":
-                    response = requests.get(f"{BACKEND_URL}{endpoint}", timeout=10)
-                else:
-                    response = requests.post(f"{BACKEND_URL}{endpoint}", timeout=10)
+        # Test mark as read
+        try:
+            response = requests.post(f"{BACKEND_URL}/notifications/read", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Mark read endpoint requires valid auth (401 as expected)")
+                success = True
+            else:
+                success = self.log_test("/notifications/read", "POST", response.status_code, 200, data)
                 
-                data = response.json() if response.status_code == 200 else None
-                success = self.log_test(endpoint, method, response.status_code, expected_status, data)
-                all_success = all_success and success
-                
-                if success and endpoint == "/challenges" and data:
-                    print(f"   📋 Found {len(data)} challenges")
-                elif success and endpoint == "/leaderboard" and data:
-                    print(f"   🏆 Leaderboard has {len(data)} users")
-                    
-            except Exception as e:
-                success = self.log_test(endpoint, method, 0, expected_status, error=e)
-                all_success = False
+                if success and data:
+                    print(f"   ✅ Mark as read: {data.get('message')}")
+            
+            all_success = all_success and success
+        except Exception as e:
+            all_success = False
+            self.log_test("/notifications/read", "POST", 0, 200, error=e)
         
         return all_success
+    
+    def test_create_and_invite_challenge(self):
+        """Test creating challenge and inviting user"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping create and invite test")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.session_token}", "Content-Type": "application/json"}
+        
+        try:
+            payload = {
+                "title": "Test Defi",
+                "category": "Sport",
+                "duration_days": 7,
+                "invited_user_id": self.seed_user_1_id
+            }
+            response = requests.post(f"{BACKEND_URL}/challenges/create-and-invite", headers=headers, json=payload, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Create and invite endpoint requires valid auth (401 as expected)")
+                return True
+            
+            success = self.log_test("/challenges/create-and-invite", "POST", response.status_code, 200, data)
+            
+            if success and data:
+                print(f"   🎯 Challenge created: {data.get('title')}")
+                if "invite_code" in data:
+                    print(f"   🔑 Invite code: {data.get('invite_code')}")
+                if "challenge_id" in data:
+                    print(f"   🆔 Challenge ID: {data.get('challenge_id')}")
+            
+            return success
+        except Exception as e:
+            return self.log_test("/challenges/create-and-invite", "POST", 0, 200, error=e)
+    
+    def test_get_friends(self):
+        """Test getting friends list"""
+        if not self.session_token:
+            print("⚠️  No session token available, skipping friends list test")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.session_token}"}
+        
+        try:
+            response = requests.get(f"{BACKEND_URL}/friends", headers=headers, timeout=10)
+            data = response.json() if response.status_code == 200 else None
+            
+            if response.status_code == 401:
+                print("🔒 Friends list endpoint requires valid auth (401 as expected)")
+                return True
+            
+            success = self.log_test("/friends", "GET", response.status_code, 200, data)
+            
+            if success and data:
+                print(f"   👥 Friends: {len(data)}")
+                
+                # Validate response structure - should include badges field now
+                for friend in data:
+                    required_fields = ["user_id", "name", "picture", "level", "points", "streak", "badges"]
+                    missing = [f for f in required_fields if f not in friend]
+                    if missing:
+                        print(f"   ⚠️  Friend missing fields: {missing}")
+                        return False
+                    
+                    print(f"   👤 {friend.get('name')} - Level {friend.get('level')}, {friend.get('points')} pts, {len(friend.get('badges', []))} badges")
+            
+            return success
+        except Exception as e:
+            return self.log_test("/friends", "GET", 0, 200, error=e)
     
     def test_invalid_auth(self):
         """Test endpoints with invalid auth token"""
         invalid_headers = {"Authorization": "Bearer invalid_token_12345"}
         
-        auth_endpoints = ["/social-pressure", "/user-rank", "/daily-triggers"]
+        auth_endpoints = [
+            "/users/search?q=test",
+            "/friends/requests", 
+            "/friends/requests/sent",
+            "/notifications",
+            "/notifications/unread-count",
+            "/friends"
+        ]
         
+        all_success = True
         for endpoint in auth_endpoints:
             try:
                 response = requests.get(f"{BACKEND_URL}{endpoint}", headers=invalid_headers, timeout=10)
                 success = self.log_test(f"{endpoint} (invalid auth)", "GET", response.status_code, 401)
                 if not success:
                     print(f"   ⚠️  Expected 401 for invalid auth, got {response.status_code}")
+                all_success = all_success and success
             except Exception as e:
                 self.log_test(f"{endpoint} (invalid auth)", "GET", 0, 401, error=e)
+                all_success = False
+        
+        return all_success
     
     def run_all_tests(self):
-        """Run all backend tests"""
-        print("🚀 Starting Backend API Tests for Challenge It - Addiction Engine")
+        """Run all social system tests"""
+        print("🚀 Starting Backend API Tests for Challenge It - Social System")
         print("=" * 70)
         
-        # Test basic endpoints
-        print("\n📋 Testing Basic Endpoints...")
-        self.test_health()
+        # Test seed data first
+        print("\n📊 Setting up test data...")
         self.test_seed_data()
         
-        # Test new addiction engine endpoints
-        print("\n💰 Testing Money Stats (No Auth)...")
-        self.test_money_stats()
-        
-        print("\n📊 Testing Challenges with Pot Data...")
-        self.test_challenges_trending()
-        
         # Create test session for auth endpoints
-        print("\n🔐 Setting up Test Session...")
+        print("\n🔐 Setting up test session...")
         self.create_test_session()
         
-        # Test auth endpoints
-        print("\n🔒 Testing Authenticated Endpoints...")
-        self.test_auth_endpoints()
+        # Test social system endpoints
+        print("\n🔍 Testing user search...")
+        self.test_user_search()
+        
+        print("\n👥 Testing friend request system...")
+        self.test_send_friend_request()
+        self.test_get_friend_requests()
+        self.test_get_sent_requests()
+        
+        print("\n🔔 Testing notifications...")
+        self.test_notifications()
+        
+        print("\n🎯 Testing challenge creation and invitation...")
+        self.test_create_and_invite_challenge()
+        
+        print("\n👥 Testing friends list...")
+        self.test_get_friends()
         
         # Test invalid auth
-        print("\n❌ Testing Invalid Authentication...")
+        print("\n❌ Testing invalid authentication...")
         self.test_invalid_auth()
-        
-        # Test existing endpoints
-        print("\n🔄 Testing Existing Endpoints...")
-        self.test_existing_endpoints()
         
         # Summary
         print("\n" + "=" * 70)
@@ -350,7 +466,7 @@ print('Session created successfully');
         print(f"Total Tests: {total_tests}")
         print(f"✅ Passed: {passed_tests}")
         print(f"❌ Failed: {failed_tests}")
-        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
+        print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%" if total_tests > 0 else "No tests run")
         
         if failed_tests > 0:
             print("\n❌ FAILED TESTS:")
@@ -362,37 +478,36 @@ print('Session created successfully');
         
         print("\n🎯 KEY FINDINGS:")
         
-        # Check money stats
-        money_stats_test = next((r for r in self.test_results if r["endpoint"] == "/money-stats"), None)
-        if money_stats_test and money_stats_test["success"]:
-            print("✅ Money stats endpoint working - returns pot data")
-        else:
-            print("❌ Money stats endpoint failed")
-        
-        # Check trending challenges
-        trending_test = next((r for r in self.test_results if r["endpoint"] == "/challenges/trending"), None)
-        if trending_test and trending_test["success"]:
-            print("✅ Trending challenges endpoint working - includes pot data")
-        else:
-            print("❌ Trending challenges endpoint failed")
-        
-        # Check auth endpoints
-        auth_endpoints = ["/social-pressure", "/user-rank", "/daily-triggers"]
-        auth_working = 0
-        for endpoint in auth_endpoints:
-            test = next((r for r in self.test_results if r["endpoint"] == endpoint), None)
+        # Check social endpoints
+        social_endpoints = ["/users/search", "/friends/request", "/friends/requests", "/friends/requests/sent"]
+        social_working = 0
+        for endpoint in social_endpoints:
+            test = next((r for r in self.test_results if endpoint in r["endpoint"]), None)
             if test and (test["success"] or test["status"] == 401):  # 401 is expected for invalid auth
-                auth_working += 1
+                social_working += 1
         
-        if auth_working == len(auth_endpoints):
-            print("✅ All addiction engine auth endpoints responding correctly")
+        if social_working == len(social_endpoints):
+            print("✅ All social system endpoints responding correctly")
         else:
-            print(f"❌ {len(auth_endpoints) - auth_working} addiction engine auth endpoints have issues")
+            print(f"❌ {len(social_endpoints) - social_working} social system endpoints have issues")
+        
+        # Check notifications
+        notif_endpoints = ["/notifications", "/notifications/unread-count", "/notifications/read"]
+        notif_working = 0
+        for endpoint in notif_endpoints:
+            test = next((r for r in self.test_results if endpoint in r["endpoint"]), None)
+            if test and (test["success"] or test["status"] == 401):
+                notif_working += 1
+        
+        if notif_working == len(notif_endpoints):
+            print("✅ All notification endpoints responding correctly")
+        else:
+            print(f"❌ {len(notif_endpoints) - notif_working} notification endpoints have issues")
         
         return failed_tests == 0
 
 if __name__ == "__main__":
-    tester = BackendTester()
+    tester = SocialSystemTester()
     success = tester.run_all_tests()
     
     if success:

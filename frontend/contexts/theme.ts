@@ -9,6 +9,10 @@ export const CATEGORIES: Record<string, { color: string; icon: string; iconSet: 
   'Santé': { color: '#32D74B', icon: 'heart', iconSet: 'ion' },
   'Social': { color: '#AF52DE', icon: 'people', iconSet: 'ion' },
   'Habitudes': { color: '#9D4CDD', icon: 'time', iconSet: 'ion' },
+  'Esport': { color: '#5AC8FA', icon: 'game-controller', iconSet: 'ion' },
+  'Art': { color: '#FF2D55', icon: 'color-palette', iconSet: 'ion' },
+  'Nourriture': { color: '#FF9500', icon: 'restaurant', iconSet: 'ion' },
+  'Motivation': { color: '#FF6B35', icon: 'rocket', iconSet: 'ion' },
   'Général': { color: '#A1A1AA', icon: 'star', iconSet: 'ion' },
   'Autre': { color: '#A1A1AA', icon: 'star', iconSet: 'ion' },
 };
