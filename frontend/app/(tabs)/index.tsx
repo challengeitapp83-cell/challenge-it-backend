@@ -109,7 +109,7 @@ export default function HomeScreen() {
       >
         {/* ===== HERO SECTION ===== */}
         <View style={[h.w, { paddingTop: insets.top + 12 }]}>
-          {/* Top bar */}
+          {/* 1. TOP BAR — avatar left, notif right */}
           <Fade>
             <View style={h.topBar}>
               <View style={h.avW}>
@@ -124,10 +124,7 @@ export default function HomeScreen() {
                 {rankData && (
                   <View style={h.rankRow}>
                     <Text style={h.rankT}>#{rankData.rank}</Text>
-                    <Text style={h.rankSep}>sur {rankData.total_players}</Text>
-                    {rankData.pts_to_next_rank > 0 && (
-                      <Text style={h.rankHint}> · {rankData.pts_to_next_rank} pts du top</Text>
-                    )}
+                    <Text style={h.rankSep}> sur {rankData.total_players}</Text>
                   </View>
                 )}
               </View>
@@ -138,20 +135,25 @@ export default function HomeScreen() {
             </View>
           </Fade>
 
-          {/* Logo + Motivational text */}
-          <Fade delay={100}>
-            <View style={h.brandRow}>
-              <BrandIcon size={56} />
-              <View style={h.brandText}>
-                <Text style={h.brandName}>CHALLENGE <Text style={h.brandCyan}>I</Text><Text style={h.brandMag}>T</Text></Text>
-                <Text style={h.brandTag}>Mise. Challenge. Gagne.</Text>
-              </View>
+          {/* 2. LOGO — CENTERED, BIG, with glow */}
+          <Fade delay={80}>
+            <View style={h.logoCenter}>
+              <Animated.View style={[h.logoGlow, { opacity: moneyGlow }]} />
+              <BrandIcon size={80} />
             </View>
-            <Text style={h.motto}>Depasse{'\n'}tes limites.</Text>
           </Fade>
 
-          {/* XP bar */}
+          {/* 3. TEXT — centered under logo */}
           <Fade delay={150}>
+            <View style={h.textCenter}>
+              <Text style={h.brandName}>CHALLENGE <Text style={h.brandCyan}>I</Text><Text style={h.brandMag}>T</Text></Text>
+              <Text style={h.tagline}>Mise. Challenge. Gagne.</Text>
+              <Text style={h.motto}>Depasse tes limites.</Text>
+            </View>
+          </Fade>
+
+          {/* 4. XP bar */}
+          <Fade delay={220}>
             <View style={h.xpCard}>
               <View style={h.xpRow}>
                 <Text style={h.xpLvl}>Niv. {user?.level || 1}</Text>
@@ -412,27 +414,30 @@ const g = StyleSheet.create({
 });
 
 const h = StyleSheet.create({
-  w: { paddingHorizontal: 20, paddingBottom: 18, minHeight: H * 0.38 },
-  topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  w: { paddingHorizontal: 20, paddingBottom: 24, minHeight: H * 0.42 },
+  topBar: { flexDirection: 'row', alignItems: 'center', marginBottom: 28 },
   avW: { position: 'relative' },
   av: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#00D4FF' },
   avI: { fontSize: 18, fontWeight: '800', color: '#FFF' },
   lvlBadge: { position: 'absolute', bottom: -3, right: -3, backgroundColor: '#00D4FF', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#0C0C1A' },
   lvlN: { fontSize: 9, fontWeight: '900', color: '#FFF' },
   greeting: { fontSize: 17, fontWeight: '800', color: '#FFF' },
-  rankRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  rankRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   rankT: { fontSize: 14, fontWeight: '900', color: '#00D4FF' },
   rankSep: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
-  rankHint: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.25)' },
   notifBtn: { width: 44, height: 44, borderRadius: 22, ...GL, justifyContent: 'center', alignItems: 'center' },
   notifDot: { position: 'absolute', top: 8, right: 10, width: 9, height: 9, borderRadius: 5, backgroundColor: '#FF3B30' },
-  motto: { fontSize: 36, fontWeight: '900', color: '#FFF', lineHeight: 42, letterSpacing: -1, marginBottom: 18 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
-  brandText: { gap: 2 },
-  brandName: { fontSize: 20, fontWeight: '900', color: '#FFF', letterSpacing: 1 },
+  // Logo centered
+  logoCenter: { alignItems: 'center', marginBottom: 20, position: 'relative' },
+  logoGlow: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: '#007AFF' },
+  // Text centered
+  textCenter: { alignItems: 'center', marginBottom: 24, gap: 6 },
+  brandName: { fontSize: 26, fontWeight: '900', color: '#FFF', letterSpacing: 2.5, textAlign: 'center' },
   brandCyan: { color: '#00D4FF' },
   brandMag: { color: '#C850C0' },
-  brandTag: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+  tagline: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.45)', textAlign: 'center' },
+  motto: { fontSize: 22, fontWeight: '800', color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontStyle: 'italic' },
+  // XP
   xpCard: { ...GL, borderRadius: 14, padding: 12 },
   xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   xpLvl: { fontSize: 13, fontWeight: '800', color: '#00D4FF' },
