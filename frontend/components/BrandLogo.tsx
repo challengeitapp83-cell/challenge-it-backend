@@ -105,7 +105,7 @@ export function BrandLoader({ size = 64 }: { size?: number }) {
 const s = StyleSheet.create({
   // Icon
   iconWrap: { overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-  iconGlow: { position: 'absolute', opacity: 0.1, borderRadius: 999 },
+  iconGlow: { position: 'absolute', opacity: 0.06, borderRadius: 999 },
   iconContent: { justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   iconTextRow: { flexDirection: 'row', alignItems: 'center' },
   iconLetterCyan: { fontWeight: '900', color: CYAN, letterSpacing: -1 },

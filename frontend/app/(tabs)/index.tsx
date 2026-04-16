@@ -135,10 +135,9 @@ export default function HomeScreen() {
             </View>
           </Fade>
 
-          {/* 2. LOGO — CENTERED, BIG, with glow */}
+          {/* 2. LOGO — CENTERED, BIG, clean */}
           <Fade delay={80}>
             <View style={h.logoCenter}>
-              <Animated.View style={[h.logoGlow, { opacity: moneyGlow }]} />
               <BrandIcon size={80} />
             </View>
           </Fade>
@@ -428,8 +427,7 @@ const h = StyleSheet.create({
   notifBtn: { width: 44, height: 44, borderRadius: 22, ...GL, justifyContent: 'center', alignItems: 'center' },
   notifDot: { position: 'absolute', top: 8, right: 10, width: 9, height: 9, borderRadius: 5, backgroundColor: '#FF3B30' },
   // Logo centered
-  logoCenter: { alignItems: 'center', marginBottom: 20, position: 'relative' },
-  logoGlow: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: '#007AFF' },
+  logoCenter: { alignItems: 'center', marginBottom: 20 },
   // Text centered
   textCenter: { alignItems: 'center', marginBottom: 24, gap: 6 },
   brandName: { fontSize: 26, fontWeight: '900', color: '#FFF', letterSpacing: 2.5, textAlign: 'center' },

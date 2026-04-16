@@ -27,24 +27,32 @@ function ActionMenu({ visible, onClose, router }: { visible: boolean; onClose: (
   if (!visible) return null;
 
   const actions = [
-    { icon: 'flash', label: 'Creer un defi', color: '#007AFF', route: '/create-challenge' },
-    { icon: 'enter', label: 'Rejoindre un defi', color: '#34C759', route: '/(tabs)/challenges' },
-    { icon: 'people', label: 'Defier un ami', color: '#AF52DE', route: '/social' },
+    { icon: 'flash', label: 'Creer un defi', desc: 'Lance ton propre defi', color: '#00D4FF', route: '/create-challenge' },
+    { icon: 'enter', label: 'Rejoindre un defi', desc: 'Explore les defis actifs', color: '#34C759', route: '/(tabs)/challenges' },
+    { icon: 'people', label: 'Defier un ami', desc: 'Challenge tes amis', color: '#C850C0', route: '/social' },
   ];
 
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
       <Pressable style={mn.overlay} onPress={onClose}>
         <Animated.View style={[mn.menu, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
+          <LinearGradient colors={['#1A1A35', '#0F0F22']} style={mn.menuBg} />
+          <View style={mn.handle} />
+          <Text style={mn.menuTitle}>Que veux-tu faire ?</Text>
           {actions.map((a, i) => (
             <TouchableOpacity key={i} activeOpacity={0.8}
               onPress={() => { onClose(); router.push(a.route); }}
               style={mn.menuItem}>
-              <View style={[mn.menuIcon, { backgroundColor: a.color + '18' }]}>
-                <Ionicons name={a.icon as any} size={22} color={a.color} />
+              <View style={[mn.menuIcon, { backgroundColor: a.color + '15' }]}>
+                <Ionicons name={a.icon as any} size={24} color={a.color} />
               </View>
-              <Text style={mn.menuLabel}>{a.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.3)" />
+              <View style={mn.menuTextW}>
+                <Text style={mn.menuLabel}>{a.label}</Text>
+                <Text style={mn.menuDesc}>{a.desc}</Text>
+              </View>
+              <View style={[mn.menuArrow, { backgroundColor: a.color + '12' }]}>
+                <Ionicons name="chevron-forward" size={16} color={a.color} />
+              </View>
             </TouchableOpacity>
           ))}
         </Animated.View>
@@ -54,11 +62,17 @@ function ActionMenu({ visible, onClose, router }: { visible: boolean; onClose: (
 }
 
 const mn = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end', paddingBottom: 110, paddingHorizontal: 20 },
-  menu: { backgroundColor: '#16162A', borderRadius: 22, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 16, borderRadius: 16 },
-  menuIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFF' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', paddingBottom: 110, paddingHorizontal: 16 },
+  menu: { borderRadius: 24, padding: 6, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,212,255,0.08)' },
+  menuBg: { ...StyleSheet.absoluteFillObject, borderRadius: 24 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+  menuTitle: { fontSize: 18, fontWeight: '800', color: '#FFF', textAlign: 'center', marginBottom: 14 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18, paddingHorizontal: 18, borderRadius: 18, marginHorizontal: 4, marginBottom: 4 },
+  menuIcon: { width: 50, height: 50, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  menuTextW: { flex: 1, gap: 2 },
+  menuLabel: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+  menuDesc: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.35)' },
+  menuArrow: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
 });
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
