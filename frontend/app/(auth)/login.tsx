@@ -18,6 +18,8 @@ import { api } from '../../contexts/api';
 import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const LOGO_URL = 'https://customer-assets.emergentagent.com/job_gamified-goals-12/artifacts/5kk57hyk_challenge%20it%20%281%29.png';
+
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -62,31 +64,27 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        {/* Logo Section */}
+        {/* Official Logo */}
         <View style={styles.logoSection}>
-          <LinearGradient
-            colors={['#007AFF', '#9D4CDD']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logoCircle}
-          >
-            <Ionicons name="flash" size={48} color="#FFFFFF" />
-          </LinearGradient>
-          <Text style={styles.appName}>Challenge It</Text>
+          <Image
+            source={{ uri: LOGO_URL }}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Relève le défi. Prouve-le.</Text>
         </View>
 
         {/* Features */}
         <View style={styles.features}>
           {[
-            { icon: 'trophy', text: 'Défis quotidiens' },
-            { icon: 'flame', text: 'Streak & progression' },
-            { icon: 'people', text: 'Classement global' },
-            { icon: 'medal', text: 'Badges premium' },
+            { icon: 'trophy', text: 'Défis quotidiens', color: COLORS.warning },
+            { icon: 'flame', text: 'Streak & progression', color: '#FF6B35' },
+            { icon: 'people', text: 'Classement global', color: COLORS.primary },
+            { icon: 'medal', text: 'Badges premium', color: COLORS.secondary },
           ].map((item, index) => (
             <View key={index} style={styles.featureRow}>
-              <View style={styles.featureIcon}>
-                <Ionicons name={item.icon as any} size={20} color={COLORS.primary} />
+              <View style={[styles.featureIcon, { backgroundColor: item.color + '15' }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
               </View>
               <Text style={styles.featureText}>{item.text}</Text>
             </View>
@@ -129,7 +127,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#12122A',
   },
   content: {
     flex: 1,
@@ -138,35 +136,21 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
+    marginBottom: 40,
   },
-  logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  appName: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    letterSpacing: -1,
-    marginBottom: SPACING.sm,
+  logoImage: {
+    width: 280,
+    height: 120,
+    marginBottom: SPACING.md,
   },
   tagline: {
     fontSize: 16,
     color: COLORS.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   features: {
-    marginBottom: SPACING.xxl,
+    marginBottom: 40,
     gap: SPACING.md,
   },
   featureRow: {
@@ -175,17 +159,16 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.card,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureText: {
     fontSize: 16,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   loginButton: {
     borderRadius: RADIUS.md,

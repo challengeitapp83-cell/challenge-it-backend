@@ -634,7 +634,7 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 156,
-            "image": "https://images.unsplash.com/photo-1758521959972-83d0bd10a152?w=800&h=500&fit=crop&q=80",
+            "image": "https://images.unsplash.com/photo-1603455778956-d71832eafa4e?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
@@ -648,7 +648,7 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 89,
-            "image": "https://images.unsplash.com/photo-1759951611066-d208d302e886?w=800&h=500&fit=crop&q=80",
+            "image": "https://images.unsplash.com/photo-1524863479829-916d8e77f114?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
@@ -662,7 +662,7 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 234,
-            "image": "https://images.unsplash.com/photo-1774185644417-b32c25456aae?w=800&h=500&fit=crop&q=80",
+            "image": "https://images.unsplash.com/photo-1740210147580-513028fcf04a?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
@@ -676,7 +676,7 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 67,
-            "image": "https://images.unsplash.com/photo-1672094272561-3d4e3685a3fa?w=800&h=500&fit=crop&q=80",
+            "image": "https://images.unsplash.com/photo-1758874384315-995106662187?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
         {
