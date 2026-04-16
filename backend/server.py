@@ -60,33 +60,46 @@ class User(BaseModel):
     total_earnings: float = 0
     friends: List[str] = []
     referral_code: Optional[str] = None
+    # Anti-cheat
+    trust_score: int = 100  # 0-100
+    trust_level: str = "fiable"  # fiable, a_surveiller, risque_eleve
+    warnings: int = 0
+    suspensions: int = 0
+    is_suspended: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Challenge(BaseModel):
     challenge_id: str = Field(default_factory=lambda: f"challenge_{uuid.uuid4().hex[:12]}")
     title: str
     description: str
-    category: str  # Sport, Business, Argent, Discipline, Santé, Social, Général
+    category: str
     duration_days: int
-    difficulty: str = "moyen"  # facile, moyen, hardcore
-    validation_type: str = "manual"  # manual, photo, video, auto
-    location: str = "monde"  # ville, pays, monde
+    difficulty: str = "moyen"
+    validation_type: str = "manual"  # manual, photo, video
+    location: str = "monde"
     is_public: bool = True
-    challenge_type: str = "community"  # "community", "friends", "solo", "random"
+    challenge_type: str = "community"
     invite_code: Optional[str] = None
     creator_id: str
     creator_name: str
     participants: List[str] = []
     participant_count: int = 0
-    max_participants: int = 0  # 0 = unlimited
-    # Pot system (simulated MVP)
+    max_participants: int = 0
+    # Pot system
     has_pot: bool = False
     pot_amount_per_person: float = 0
     pot_total: float = 0
     pot_contributions: List[str] = []
     winner_id: Optional[str] = None
     winner_name: Optional[str] = None
-    platform_commission: float = 0  # 10% of pot
+    platform_commission: float = 0
+    # Anti-cheat rules
+    proof_required: str = "photo"  # photo, video, any
+    validation_window_start: int = 5  # hour (5h)
+    validation_window_end: int = 23  # hour (23h)
+    min_trust_score: int = 0  # min trust to join
+    disputes_active: int = 0
+    is_frozen: bool = False  # frozen if dispute active on cash challenge
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     image: Optional[str] = None
 
@@ -122,14 +135,21 @@ class Proof(BaseModel):
     user_picture: Optional[str] = None
     challenge_id: str
     challenge_title: str
-    image: Optional[str] = None  # Base64 encoded or URL
-    media_url: Optional[str] = None  # URL for uploaded video/image files
+    image: Optional[str] = None
+    media_url: Optional[str] = None
     media_type: str = "text"  # text, image, video
     text: str
     day_number: int
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     likes: int = 0
     liked_by: List[str] = []
+    # Anti-cheat
+    status: str = "pending"  # pending, accepted, contested, rejected
+    trust_bonus: int = 0  # +5 for video, +2 for image, 0 for text
+    contests: List[str] = []  # user_ids who contested
+    validations: List[str] = []  # user_ids who validated
+    flags: List[str] = []  # suspicious flags
+    reviewed_by: Optional[str] = None  # admin who reviewed
 
 class ProofCreate(BaseModel):
     challenge_id: str
@@ -953,7 +973,18 @@ async def join_challenge(challenge_id: str, user: User = Depends(get_current_use
     """Join a challenge"""
     challenge = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
     if not challenge:
-        raise HTTPException(status_code=404, detail="Challenge not found")
+        raise HTTPException(status_code=404, detail="Defi introuvable")
+    
+    # Anti-cheat: check suspension
+    if hasattr(user, 'is_suspended') and user.is_suspended:
+        raise HTTPException(status_code=403, detail="Compte suspendu")
+    
+    # Anti-cheat: check trust score for cash challenges
+    if challenge.get("has_pot"):
+        user_trust = getattr(user, 'trust_score', 100)
+        min_trust = challenge.get("min_trust_score", 40)
+        if user_trust < min_trust:
+            raise HTTPException(status_code=403, detail=f"Score de confiance insuffisant ({user_trust}/100). Minimum requis : {min_trust}")
     
     # Check if already joined
     existing = await db.user_challenges.find_one({
@@ -961,7 +992,7 @@ async def join_challenge(challenge_id: str, user: User = Depends(get_current_use
         "challenge_id": challenge_id
     })
     if existing:
-        raise HTTPException(status_code=400, detail="Already joined this challenge")
+        raise HTTPException(status_code=400, detail="Deja inscrit a ce defi")
     
     # Create user challenge
     user_challenge = UserChallenge(
@@ -1041,6 +1072,10 @@ async def get_my_challenges(user: User = Depends(get_current_user)):
 @api_router.post("/proofs")
 async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current_user)):
     """Submit a proof for a challenge"""
+    # Check if user is suspended
+    if hasattr(user, 'is_suspended') and user.is_suspended:
+        raise HTTPException(status_code=403, detail="Compte suspendu. Contact le support.")
+    
     # Verify user is in the challenge
     user_challenge = await db.user_challenges.find_one({
         "user_id": user.user_id,
@@ -1048,11 +1083,30 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     }, {"_id": 0})
     
     if not user_challenge:
-        raise HTTPException(status_code=400, detail="You haven't joined this challenge")
+        raise HTTPException(status_code=400, detail="Tu n'as pas rejoint ce defi")
     
     challenge = await db.challenges.find_one({"challenge_id": proof_data.challenge_id}, {"_id": 0})
     if not challenge:
-        raise HTTPException(status_code=404, detail="Challenge not found")
+        raise HTTPException(status_code=404, detail="Defi introuvable")
+    
+    is_cash = challenge.get("has_pot", False)
+    media_type = proof_data.media_type or ("image" if proof_data.image else "text")
+    
+    # === CASH CHALLENGE ENFORCEMENT ===
+    if is_cash:
+        # 1. Video REQUIRED for cash challenges
+        if media_type != "video":
+            raise HTTPException(status_code=400, detail="Video obligatoire pour les defis avec argent")
+        # 2. Must have media
+        if not proof_data.image:
+            raise HTTPException(status_code=400, detail="Preuve video requise")
+        # 3. Check trust score
+        user_trust = getattr(user, 'trust_score', 100)
+        if user_trust < 20:
+            raise HTTPException(status_code=403, detail="Score de confiance trop bas pour les defis cash")
+        # 4. Check challenge not frozen
+        if challenge.get("is_frozen"):
+            raise HTTPException(status_code=400, detail="Defi gele - verification en cours")
     
     # Check if already submitted proof today
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1063,10 +1117,25 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     })
     
     if existing_proof:
-        raise HTTPException(status_code=400, detail="You've already submitted a proof today for this challenge")
+        raise HTTPException(status_code=400, detail="Preuve deja soumise aujourd'hui")
+    
+    # === ANTI-CHEAT CHECKS ===
+    flags = await _check_suspicious(user.user_id, proof_data.challenge_id, {
+        "image": proof_data.image,
+        "media_type": media_type,
+    })
+    
+    # Calculate trust bonus
+    trust_bonus = 5 if media_type == "video" else 2 if media_type == "image" else 0
+    
+    # Determine initial status
+    initial_status = "pending"
+    if not is_cash and not flags:
+        initial_status = "accepted"  # Auto-accept non-cash without flags
+    elif flags:
+        initial_status = "pending"  # Needs review if flags
     
     # Create proof
-    media_type = proof_data.media_type or ("image" if proof_data.image else "text")
     is_cloud_url = proof_data.image and (
         proof_data.image.startswith("https://res.cloudinary.com") or
         proof_data.image.startswith("http")
@@ -1081,9 +1150,17 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
         media_url=proof_data.image if (media_type == "video" or is_cloud_url) else None,
         media_type=media_type,
         text=proof_data.text,
-        day_number=user_challenge["current_day"]
+        day_number=user_challenge["current_day"],
+        status=initial_status,
+        trust_bonus=trust_bonus,
+        flags=flags,
     )
     await db.proofs.insert_one(proof.dict())
+    
+    # Update trust score
+    await _update_trust_score(user.user_id, trust_bonus, f"proof_{media_type}")
+    if "image_dupliquee" in flags:
+        await _update_trust_score(user.user_id, -10, "duplicate_image")
     
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
@@ -1238,6 +1315,241 @@ async def like_proof(proof_id: str, user: User = Depends(get_current_user)):
             {"$inc": {"reputation": 1}}
         )
         return {"liked": True}
+
+# ==================== ANTI-CHEAT SYSTEM ====================
+
+async def _update_trust_score(user_id: str, delta: int, reason: str = ""):
+    """Update user's trust score and level"""
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return
+    current = user.get("trust_score", 100)
+    new_score = max(0, min(100, current + delta))
+    level = "fiable" if new_score >= 70 else "a_surveiller" if new_score >= 40 else "risque_eleve"
+    update = {"$set": {"trust_score": new_score, "trust_level": level}}
+    if delta < -10:
+        update["$inc"] = {"warnings": 1}
+    await db.users.update_one({"user_id": user_id}, update)
+
+async def _check_suspicious(user_id: str, challenge_id: str, proof_data: dict) -> List[str]:
+    """Check for suspicious behavior, return list of flags"""
+    import hashlib
+    flags = []
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 1. Check time window
+    now_hour = datetime.now(timezone.utc).hour
+    ch = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if ch:
+        ws = ch.get("validation_window_start", 5)
+        we = ch.get("validation_window_end", 23)
+        if now_hour < ws or now_hour >= we:
+            flags.append("hors_fenetre")
+    
+    # 2. Check duplicate image (same URL used before)
+    if proof_data.get("image"):
+        existing = await db.proofs.find_one({
+            "user_id": user_id,
+            "image": proof_data["image"],
+            "proof_id": {"$ne": proof_data.get("proof_id", "")},
+        })
+        if existing:
+            flags.append("image_dupliquee")
+    
+    # 3. Text-only proof for cash challenge
+    if ch and ch.get("has_pot") and proof_data.get("media_type") == "text":
+        flags.append("preuve_faible_cash")
+    
+    # 4. Photo-only for cash challenge (video required)
+    if ch and ch.get("has_pot") and proof_data.get("media_type") == "image":
+        flags.append("photo_seule_cash")
+    
+    # 5. Too many contested proofs recently
+    recent_contested = await db.proofs.count_documents({
+        "user_id": user_id,
+        "status": "contested",
+        "created_at": {"$gte": today_start - timedelta(days=7)},
+    })
+    if recent_contested >= 3:
+        flags.append("contestations_repetees")
+    
+    return flags
+
+def _get_daily_code(challenge_id: str, day: int) -> str:
+    """Generate a deterministic daily verification code for a challenge"""
+    import hashlib
+    seed = f"challengeit_{challenge_id}_{day}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+    h = hashlib.sha256(seed.encode()).hexdigest()[:6].upper()
+    return h
+
+@api_router.get("/challenges/{challenge_id}/daily-code")
+async def get_daily_code(challenge_id: str, user: User = Depends(get_current_user)):
+    """Get today's verification code for a challenge (anti-fake)"""
+    uc = await db.user_challenges.find_one(
+        {"user_id": user.user_id, "challenge_id": challenge_id}, {"_id": 0}
+    )
+    if not uc:
+        raise HTTPException(status_code=403, detail="Tu dois participer au defi")
+    
+    ch = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if not ch:
+        raise HTTPException(status_code=404, detail="Defi introuvable")
+    
+    day = uc.get("current_day", 1)
+    code = _get_daily_code(challenge_id, day)
+    is_cash = ch.get("has_pot", False)
+    
+    return {
+        "code": code,
+        "day": day,
+        "is_cash": is_cash,
+        "proof_required": "video" if is_cash else ch.get("proof_required", "photo"),
+        "instruction": f"Montre le code {code} dans ta video" if is_cash else f"Code du jour : {code}",
+        "window_start": ch.get("validation_window_start", 5),
+        "window_end": ch.get("validation_window_end", 23),
+    }
+
+@api_router.get("/users/me/trust-profile")
+async def get_my_trust_profile(user: User = Depends(get_current_user)):
+    """Get current user's trust profile"""
+    total_proofs = await db.proofs.count_documents({"user_id": user.user_id})
+    accepted_proofs = await db.proofs.count_documents({"user_id": user.user_id, "status": "accepted"})
+    contested_proofs = await db.proofs.count_documents({"user_id": user.user_id, "status": "contested"})
+    rejected_proofs = await db.proofs.count_documents({"user_id": user.user_id, "status": "rejected"})
+    video_proofs = await db.proofs.count_documents({"user_id": user.user_id, "media_type": "video"})
+    
+    return {
+        "trust_score": user.trust_score if hasattr(user, 'trust_score') else 100,
+        "trust_level": user.trust_level if hasattr(user, 'trust_level') else "fiable",
+        "warnings": user.warnings if hasattr(user, 'warnings') else 0,
+        "is_suspended": user.is_suspended if hasattr(user, 'is_suspended') else False,
+        "total_proofs": total_proofs,
+        "accepted_proofs": accepted_proofs,
+        "contested_proofs": contested_proofs,
+        "rejected_proofs": rejected_proofs,
+        "video_proofs": video_proofs,
+        "can_join_cash": (user.trust_score if hasattr(user, 'trust_score') else 100) >= 40,
+    }
+
+@api_router.post("/proofs/{proof_id}/contest")
+async def contest_proof(proof_id: str, request: Request, user: User = Depends(get_current_user)):
+    """Contest a proof (by a participant of the same challenge)"""
+    proof = await db.proofs.find_one({"proof_id": proof_id}, {"_id": 0})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Preuve introuvable")
+    if proof["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Tu ne peux pas contester ta propre preuve")
+    if user.user_id in (proof.get("contests") or []):
+        raise HTTPException(status_code=400, detail="Deja conteste")
+    
+    # Check user is in same challenge
+    uc = await db.user_challenges.find_one({"user_id": user.user_id, "challenge_id": proof["challenge_id"]})
+    if not uc:
+        raise HTTPException(status_code=403, detail="Tu dois participer au defi pour contester")
+    
+    body = await request.json()
+    reason = body.get("reason", "")
+    
+    await db.proofs.update_one({"proof_id": proof_id}, {
+        "$addToSet": {"contests": user.user_id},
+        "$set": {"status": "contested"},
+    })
+    
+    # If 2+ contests, flag as suspicious and lower trust
+    contests = (proof.get("contests") or []) + [user.user_id]
+    if len(contests) >= 2:
+        await _update_trust_score(proof["user_id"], -15, "multiple_contests")
+        await db.proofs.update_one({"proof_id": proof_id}, {"$addToSet": {"flags": "multi_conteste"}})
+        # Freeze challenge pot if cash
+        ch = await db.challenges.find_one({"challenge_id": proof["challenge_id"]}, {"_id": 0})
+        if ch and ch.get("has_pot"):
+            await db.challenges.update_one(
+                {"challenge_id": proof["challenge_id"]},
+                {"$set": {"is_frozen": True}, "$inc": {"disputes_active": 1}}
+            )
+    
+    await _create_notification(proof["user_id"], "proof_contested",
+        f"Ta preuve a ete contestee pour \"{proof.get('challenge_title', '')}\"",
+        {"proof_id": proof_id, "challenge_id": proof["challenge_id"], "icon": "warning", "color": "#FF3B30"}
+    )
+    
+    return {"message": "Preuve contestee", "contests_count": len(contests)}
+
+@api_router.post("/proofs/{proof_id}/validate")
+async def validate_proof(proof_id: str, user: User = Depends(get_current_user)):
+    """Validate a proof (by a participant)"""
+    proof = await db.proofs.find_one({"proof_id": proof_id}, {"_id": 0})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Preuve introuvable")
+    if proof["user_id"] == user.user_id:
+        raise HTTPException(status_code=400, detail="Tu ne peux pas valider ta propre preuve")
+    if user.user_id in (proof.get("validations") or []):
+        raise HTTPException(status_code=400, detail="Deja valide")
+    
+    await db.proofs.update_one({"proof_id": proof_id}, {
+        "$addToSet": {"validations": user.user_id},
+    })
+    
+    validations = (proof.get("validations") or []) + [user.user_id]
+    if len(validations) >= 2 and proof.get("status") != "rejected":
+        await db.proofs.update_one({"proof_id": proof_id}, {"$set": {"status": "accepted"}})
+        await _update_trust_score(proof["user_id"], 3, "peer_validated")
+    
+    return {"message": "Preuve validee", "validations_count": len(validations)}
+
+@api_router.get("/users/{user_id}/trust")
+async def get_user_trust(user_id: str):
+    """Get user's trust score and level"""
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "trust_score": 1, "trust_level": 1, "warnings": 1})
+    if not u:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return {
+        "trust_score": u.get("trust_score", 100),
+        "trust_level": u.get("trust_level", "fiable"),
+        "warnings": u.get("warnings", 0),
+    }
+
+@api_router.get("/admin/flagged-proofs")
+async def get_flagged_proofs():
+    """Admin: get all contested/flagged proofs"""
+    proofs = await db.proofs.find(
+        {"$or": [{"status": "contested"}, {"flags": {"$ne": []}}]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    return proofs
+
+@api_router.post("/admin/proofs/{proof_id}/resolve")
+async def resolve_proof(proof_id: str, request: Request):
+    """Admin: resolve a contested proof"""
+    body = await request.json()
+    decision = body.get("decision", "accepted")  # accepted, rejected
+    
+    proof = await db.proofs.find_one({"proof_id": proof_id}, {"_id": 0})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Preuve introuvable")
+    
+    await db.proofs.update_one({"proof_id": proof_id}, {
+        "$set": {"status": decision, "reviewed_by": "admin"}
+    })
+    
+    if decision == "rejected":
+        await _update_trust_score(proof["user_id"], -20, "admin_rejected")
+        await _create_notification(proof["user_id"], "proof_rejected",
+            f"Ta preuve a ete rejetee pour \"{proof.get('challenge_title', '')}\"",
+            {"proof_id": proof_id, "icon": "close-circle", "color": "#FF3B30"}
+        )
+    else:
+        await _update_trust_score(proof["user_id"], 5, "admin_accepted")
+        # Unfreeze challenge if was frozen
+        ch = await db.challenges.find_one({"challenge_id": proof["challenge_id"]}, {"_id": 0})
+        if ch and ch.get("is_frozen"):
+            remaining = max(0, (ch.get("disputes_active", 1)) - 1)
+            update_ch = {"$set": {"disputes_active": remaining}}
+            if remaining == 0:
+                update_ch["$set"]["is_frozen"] = False
+            await db.challenges.update_one({"challenge_id": proof["challenge_id"]}, update_ch)
+    
+    return {"message": f"Preuve {decision}", "proof_id": proof_id}
 
 # ==================== CHALLENGE COMPLETION ====================
 
