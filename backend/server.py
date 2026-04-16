@@ -1441,6 +1441,23 @@ async def get_challenge_templates():
     """Get predefined challenge templates"""
     return CHALLENGE_TEMPLATES
 
+@api_router.get("/recent-gains")
+async def get_recent_gains():
+    """Get simulated recent gains for social proof"""
+    import random
+    names = ["Alex M.", "Sarah K.", "Thomas L.", "Lea R.", "Hugo B.", "Emma D.", "Lucas P.", "Chloe V.", "Nathan F.", "Jade A."]
+    challenges = ["100 Pompes/jour", "7j sans sucre", "Reveil 6h", "1h de focus", "30min course", "Zero tabac", "2L eau/jour", "Meditation 10min"]
+    gains_list = []
+    for i in range(8):
+        gains_list.append({
+            "id": f"gain_{i}",
+            "user_name": names[i % len(names)],
+            "challenge_title": challenges[i % len(challenges)],
+            "amount": random.choice([20, 35, 50, 75, 100, 120, 150, 200]),
+            "days_ago": random.randint(0, 3),
+        })
+    return gains_list
+
 # ==================== BADGE ROUTES ====================
 
 @api_router.get("/badges")

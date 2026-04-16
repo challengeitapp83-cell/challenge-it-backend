@@ -39,6 +39,7 @@ export default function HomeScreen() {
   const [rankData, setRankData] = useState<any>(null);
   const [moneyStats, setMoneyStats] = useState<any>(null);
   const [triggers, setTriggers] = useState<any[]>([]);
+  const [recentGains, setRecentGains] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +71,7 @@ export default function HomeScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [t, tpl, ac, l, sp, rd, ms, tr2] = await Promise.all([
+      const [t, tpl, ac2, l, sp, rd, ms, tr2, rg] = await Promise.all([
         api.get('/api/challenges/trending?limit=8').catch(() => []),
         api.get('/api/challenge-templates').catch(() => []),
         api.get('/api/my-challenges').catch(() => []),
@@ -79,8 +80,10 @@ export default function HomeScreen() {
         api.get('/api/user-rank').catch(() => null),
         api.get('/api/money-stats').catch(() => null),
         api.get('/api/daily-triggers').catch(() => []),
+        api.get('/api/recent-gains').catch(() => []),
       ]);
-      setTrending(t); setTemplates(tpl); setActive(ac); setLb(l);
+      setTrending(t); setTemplates(tpl); setActive(ac2); setLb(l);
+      setPressure(sp); setRankData(rd); setMoneyStats(ms); setTriggers(tr2); setRecentGains(rg);
       setPressure(sp); setRankData(rd); setMoneyStats(ms); setTriggers(tr2);
     } catch {} finally { setLoading(false); }
   }, []);
@@ -409,6 +412,32 @@ export default function HomeScreen() {
           </View>
         </Fade>
 
+        {/* ===== GAINS RECENTS ===== */}
+        {recentGains.length > 0 && (
+          <Fade delay={360}>
+            <View style={sec.w}>
+              <View style={sec.h}>
+                <View style={sec.hL}><Ionicons name="cash" size={18} color="#34C759" /><Text style={sec.t}>Gains recents</Text></View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
+                {recentGains.slice(0, 6).map((g: any) => (
+                  <View key={g.id} style={gn.card}>
+                    <View style={gn.avW}>
+                      <LinearGradient colors={['#34C759', '#28A745']} style={gn.av}>
+                        <Text style={gn.avI}>{g.user_name?.charAt(0)}</Text>
+                      </LinearGradient>
+                    </View>
+                    <Text style={gn.amount}>+{g.amount}€</Text>
+                    <Text style={gn.name} numberOfLines={1}>{g.user_name}</Text>
+                    <Text style={gn.ch} numberOfLines={1}>{g.challenge_title}</Text>
+                    <Text style={gn.time}>{g.days_ago === 0 ? "Aujourd'hui" : `Il y a ${g.days_ago}j`}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </Fade>
+        )}
+
         {/* ===== TOP CHALLENGERS ===== */}
         <Fade delay={380}>
           <View style={sec.w}>
@@ -602,4 +631,15 @@ const tp = StyleSheet.create({
   metaT: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
   launchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
   launchT: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+});
+
+const gn = StyleSheet.create({
+  card: { width: 120, alignItems: 'center', ...GL, borderRadius: 16, padding: 14, marginRight: 10, borderColor: 'rgba(52,199,89,0.12)' },
+  avW: { marginBottom: 8 },
+  av: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  avI: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  amount: { fontSize: 20, fontWeight: '900', color: '#34C759', marginBottom: 4 },
+  name: { fontSize: 12, fontWeight: '700', color: '#FFF', marginBottom: 2 },
+  ch: { fontSize: 10, fontWeight: '500', color: 'rgba(255,255,255,0.35)', textAlign: 'center' },
+  time: { fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.2)', marginTop: 4 },
 });

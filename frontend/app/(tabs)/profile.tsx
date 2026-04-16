@@ -28,16 +28,18 @@ export default function ProfileScreen() {
   const [history, setHistory] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [s, h, f] = await Promise.all([
+        const [s, h, f, ac] = await Promise.all([
           api.get('/api/users/me/stats').catch(() => null),
           api.get('/api/users/me/history').catch(() => []),
           api.get('/api/friends').catch(() => []),
+          api.get('/api/my-challenges').catch(() => []),
         ]);
-        setStats(s); setHistory(h); setFriends(f);
+        setStats(s); setHistory(h); setFriends(f); setActiveChallenges(ac);
       } catch {} finally { setLoading(false); }
     })();
   }, []);
@@ -127,6 +129,29 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Fade>
+
+        {/* ===== DEFIS EN COURS ===== */}
+        {activeChallenges.length > 0 && (
+          <Fade delay={215}>
+            <View style={sec.w}>
+              <Text style={sec.t}>Defis en cours ({activeChallenges.length})</Text>
+              {activeChallenges.slice(0, 5).map((uc: any) => {
+                const ch = uc.challenge;
+                const pct = ch?.duration_days ? Math.round(((uc.completed_days || 0) / ch.duration_days) * 100) : 0;
+                return (
+                  <TouchableOpacity key={uc.user_challenge_id} onPress={() => router.push(`/challenge/${ch?.challenge_id}`)} activeOpacity={0.85} style={acd.card}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={acd.title} numberOfLines={1}>{ch?.title}</Text>
+                      <Text style={acd.sub}>Jour {uc.current_day || 1}/{ch?.duration_days} · {pct}%</Text>
+                    </View>
+                    {ch?.has_pot && <Text style={acd.pot}>{ch.pot_total}€</Text>}
+                    <View style={acd.barBg}><View style={[acd.barFill, { width: `${Math.max(pct, 3)}%` as any }]} /></View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Fade>
+        )}
 
         {/* ===== FRIENDS ===== */}
         <Fade delay={220}>
@@ -276,4 +301,13 @@ const act = StyleSheet.create({
   w: { paddingHorizontal: 20 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, ...GL, borderRadius: 14, borderColor: '#FF3B3020' },
   btnT: { fontSize: 15, fontWeight: '600', color: '#FF3B30' },
+});
+
+const acd = StyleSheet.create({
+  card: { ...GL, borderRadius: 16, padding: 14, marginHorizontal: 20, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden' },
+  title: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  sub: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)', marginTop: 3 },
+  pot: { fontSize: 16, fontWeight: '900', color: '#FFD700' },
+  barBg: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.05)' },
+  barFill: { height: '100%', backgroundColor: '#00D4FF' },
 });
