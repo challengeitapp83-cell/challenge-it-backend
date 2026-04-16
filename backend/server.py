@@ -13,8 +13,14 @@ from datetime import datetime, timezone, timedelta
 import httpx
 import base64
 
+import random
+import string
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+def generate_invite_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -56,10 +62,19 @@ class Challenge(BaseModel):
     category: str  # Sport, Santé, Habitudes, Business, Autre
     duration_days: int
     is_public: bool = True
+    challenge_type: str = "community"  # "community" or "friends"
+    invite_code: Optional[str] = None
     creator_id: str
     creator_name: str
     participants: List[str] = []
     participant_count: int = 0
+    # Pot system (simulated MVP)
+    has_pot: bool = False
+    pot_amount_per_person: float = 0
+    pot_total: float = 0
+    pot_contributions: List[str] = []  # user_ids who contributed
+    winner_id: Optional[str] = None
+    winner_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     image: Optional[str] = None
 
@@ -69,6 +84,9 @@ class ChallengeCreate(BaseModel):
     category: str
     duration_days: int
     is_public: bool = True
+    challenge_type: str = "community"  # "community" or "friends"
+    has_pot: bool = False
+    pot_amount_per_person: float = 0
     image: Optional[str] = None
 
 class UserChallenge(BaseModel):
@@ -299,14 +317,21 @@ async def get_leaderboard(limit: int = 10):
 @api_router.post("/challenges")
 async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends(get_current_user)):
     """Create a new challenge"""
+    invite_code = generate_invite_code() if challenge_data.challenge_type == "friends" else None
+    is_public = challenge_data.challenge_type == "community"
+    
     challenge = Challenge(
         title=challenge_data.title,
         description=challenge_data.description,
         category=challenge_data.category,
         duration_days=challenge_data.duration_days,
-        is_public=challenge_data.is_public,
+        is_public=is_public,
+        challenge_type=challenge_data.challenge_type,
+        invite_code=invite_code,
         creator_id=user.user_id,
         creator_name=user.name,
+        has_pot=challenge_data.has_pot,
+        pot_amount_per_person=challenge_data.pot_amount_per_person,
         image=challenge_data.image
     )
     await db.challenges.insert_one(challenge.dict())
@@ -338,6 +363,103 @@ async def get_challenge(challenge_id: str):
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
     return challenge
+
+# ==================== SOCIAL / INVITE ROUTES ====================
+
+@api_router.get("/users/search")
+async def search_users(q: str, user: User = Depends(get_current_user)):
+    """Search users by name"""
+    if len(q) < 2:
+        return []
+    users = await db.users.find(
+        {"name": {"$regex": q, "$options": "i"}, "user_id": {"$ne": user.user_id}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1}
+    ).limit(10).to_list(10)
+    return users
+
+@api_router.get("/challenges/code/{invite_code}")
+async def get_challenge_by_code(invite_code: str):
+    """Get challenge by invite code"""
+    challenge = await db.challenges.find_one({"invite_code": invite_code.upper()}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Code invalide")
+    return challenge
+
+@api_router.post("/challenges/join-by-code")
+async def join_by_code(request: Request, user: User = Depends(get_current_user)):
+    """Join a challenge via invite code"""
+    body = await request.json()
+    code = body.get("code", "").upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Code requis")
+    
+    challenge = await db.challenges.find_one({"invite_code": code}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Code invalide")
+    
+    # Check if already joined
+    existing = await db.user_challenges.find_one({
+        "user_id": user.user_id, "challenge_id": challenge["challenge_id"]
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Déjà inscrit à ce défi")
+    
+    # Join
+    uc = UserChallenge(user_id=user.user_id, challenge_id=challenge["challenge_id"])
+    await db.user_challenges.insert_one(uc.dict())
+    await db.challenges.update_one(
+        {"challenge_id": challenge["challenge_id"]},
+        {"$push": {"participants": user.user_id}, "$inc": {"participant_count": 1}}
+    )
+    await db.users.update_one(
+        {"user_id": user.user_id},
+        {"$push": {"joined_challenges": challenge["challenge_id"]}}
+    )
+    await update_user_points(user.user_id, 5)
+    await check_and_award_badges(user.user_id)
+    return {"message": "Défi rejoint avec succès", "challenge": challenge}
+
+@api_router.post("/challenges/{challenge_id}/contribute-pot")
+async def contribute_pot(challenge_id: str, user: User = Depends(get_current_user)):
+    """Contribute to the challenge pot (simulated)"""
+    challenge = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+    if not challenge.get("has_pot"):
+        raise HTTPException(status_code=400, detail="Ce défi n'a pas de cagnotte")
+    if user.user_id in challenge.get("pot_contributions", []):
+        raise HTTPException(status_code=400, detail="Vous avez déjà contribué")
+    
+    # Check user joined
+    existing = await db.user_challenges.find_one({
+        "user_id": user.user_id, "challenge_id": challenge_id
+    })
+    if not existing:
+        raise HTTPException(status_code=400, detail="Vous n'avez pas rejoint ce défi")
+    
+    amount = challenge.get("pot_amount_per_person", 0)
+    await db.challenges.update_one(
+        {"challenge_id": challenge_id},
+        {
+            "$push": {"pot_contributions": user.user_id},
+            "$inc": {"pot_total": amount}
+        }
+    )
+    return {"message": f"Contribution de {amount}€ ajoutée", "new_total": challenge.get("pot_total", 0) + amount}
+
+@api_router.get("/my-friends-challenges")
+async def get_my_friends_challenges(user: User = Depends(get_current_user)):
+    """Get private/friends challenges the user is in or was invited to"""
+    # Challenges user created or joined that are friends type
+    joined_ids = user.joined_challenges or []
+    challenges = await db.challenges.find(
+        {"$or": [
+            {"challenge_type": "friends", "creator_id": user.user_id},
+            {"challenge_type": "friends", "challenge_id": {"$in": joined_ids}},
+        ]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return challenges
 
 @api_router.post("/challenges/{challenge_id}/join")
 async def join_challenge(challenge_id: str, user: User = Depends(get_current_user)):

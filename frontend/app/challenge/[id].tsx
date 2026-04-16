@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, ActivityIndicator, Alert, Share, Clipboard, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,8 +20,11 @@ export default function ChallengeDetailScreen() {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [contributing, setContributing] = useState(false);
 
   const isJoined = user?.joined_challenges?.includes(id || '');
+  const hasContributed = challenge?.pot_contributions?.includes(user?.user_id);
+  const isFriends = challenge?.challenge_type === 'friends';
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -146,6 +149,87 @@ export default function ChallengeDetailScreen() {
           </View>
         )}
 
+        {/* Pot Info */}
+        {challenge.has_pot && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cagnotte</Text>
+            <View style={styles.potCard}>
+              <LinearGradient colors={[COLORS.warning + '12', COLORS.warning + '04']} style={styles.potCardInner}>
+                <View style={styles.potHeader}>
+                  <Ionicons name="cash" size={24} color={COLORS.warning} />
+                  <View>
+                    <Text style={styles.potTotal}>{challenge.pot_total || 0}€</Text>
+                    <Text style={styles.potSub}>Cagnotte totale</Text>
+                  </View>
+                </View>
+                <View style={styles.potDetails}>
+                  <View style={styles.potDetail}>
+                    <Text style={styles.potDetailVal}>{challenge.pot_amount_per_person}€</Text>
+                    <Text style={styles.potDetailLbl}>par personne</Text>
+                  </View>
+                  <View style={styles.potDetail}>
+                    <Text style={styles.potDetailVal}>{challenge.pot_contributions?.length || 0}</Text>
+                    <Text style={styles.potDetailLbl}>contributeurs</Text>
+                  </View>
+                </View>
+                {challenge.winner_name && (
+                  <View style={styles.winnerRow}>
+                    <Ionicons name="trophy" size={18} color={COLORS.warning} />
+                    <Text style={styles.winnerText}>Gagnant : {challenge.winner_name}</Text>
+                  </View>
+                )}
+                {isJoined && !hasContributed && !challenge.winner_id && (
+                  <TouchableOpacity testID="contribute-pot-btn" onPress={async () => {
+                    setContributing(true);
+                    try {
+                      await api.post(`/api/challenges/${id}/contribute-pot`);
+                      Alert.alert('Contribution ajoutée !', `${challenge.pot_amount_per_person}€ ajoutés à la cagnotte`);
+                      fetchData();
+                    } catch (e: any) { Alert.alert('Erreur', e.message?.includes('déjà') ? 'Vous avez déjà contribué' : 'Erreur'); }
+                    finally { setContributing(false); }
+                  }} disabled={contributing} style={styles.contributeBtn}>
+                    <LinearGradient colors={[COLORS.warning, '#E8A300']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.contributeBtnInner}>
+                      {contributing ? <ActivityIndicator color="#000" size="small" /> : (
+                        <>
+                          <Ionicons name="cash" size={18} color="#000" />
+                          <Text style={styles.contributeBtnText}>Contribuer {challenge.pot_amount_per_person}€</Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+                {hasContributed && (
+                  <View style={styles.contributedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                    <Text style={styles.contributedText}>Vous avez contribué</Text>
+                  </View>
+                )}
+              </LinearGradient>
+            </View>
+          </View>
+        )}
+
+        {/* Invite Code (Friends challenges) */}
+        {isFriends && challenge.invite_code && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Inviter des amis</Text>
+            <View style={styles.inviteCard}>
+              <Text style={styles.inviteLabel}>Code d'invitation</Text>
+              <View style={styles.inviteCodeRow}>
+                <Text style={styles.inviteCode}>{challenge.invite_code}</Text>
+                <TouchableOpacity testID="share-invite-btn" onPress={async () => {
+                  try {
+                    await Share.share({ message: `Rejoins mon défi "${challenge.title}" sur Challenge It !\n\nCode : ${challenge.invite_code}` });
+                  } catch {}
+                }} style={styles.shareBtn}>
+                  <Ionicons name="share-social" size={20} color={COLORS.primary} />
+                  <Text style={styles.shareBtnText}>Partager</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Join / Publish */}
         {!isJoined ? (
           <TouchableOpacity
@@ -254,4 +338,28 @@ const styles = StyleSheet.create({
   },
   joinText: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
   errorText: { fontSize: 16, color: COLORS.textMuted, textAlign: 'center', marginTop: 100 },
+  // Pot
+  potCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.warning + '20' },
+  potCardInner: { padding: 16, gap: 14 },
+  potHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  potTotal: { fontSize: 28, fontWeight: '900', color: COLORS.warning },
+  potSub: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  potDetails: { flexDirection: 'row', gap: 20 },
+  potDetail: {},
+  potDetailVal: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  potDetailLbl: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
+  winnerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.warning + '15', borderRadius: 10, padding: 10 },
+  winnerText: { fontSize: 14, fontWeight: '700', color: COLORS.warning },
+  contributeBtn: { borderRadius: 12, overflow: 'hidden' },
+  contributeBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },
+  contributeBtnText: { fontSize: 15, fontWeight: '700', color: '#000' },
+  contributedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contributedText: { fontSize: 13, fontWeight: '600', color: COLORS.success },
+  // Invite
+  inviteCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.border },
+  inviteLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted, marginBottom: 10 },
+  inviteCodeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  inviteCode: { fontSize: 28, fontWeight: '900', color: COLORS.secondary, letterSpacing: 6 },
+  shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.primary + '15', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  shareBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
 });
