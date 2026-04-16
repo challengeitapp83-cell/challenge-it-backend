@@ -19,14 +19,23 @@
 - Dark mode only, premium feel
 
 ## Screens
-1. **Login** - Google OAuth with brand identity
-2. **Home** (priority) - User header, stats, active challenges, trending, mini leaderboard, badges
-3. **Challenges** - List with category filters
-4. **Challenge Detail** - Info, stats, leaderboard, join/publish CTA
-5. **Publish Proof** - Challenge selector, image upload, text
-6. **Leaderboard** - Global rankings with top 3 podium
-7. **Profile** - Stats grid, badges, level progression, logout
-8. **Create Challenge** - Form with category, duration, visibility
+1. **Login** - Google OAuth with brand identity, addictive messaging
+2. **Home** (KEY SCREEN) - Money banner, social pressure feed, active challenges, ranking widget, triggers, trending with pots, badges with XP bonuses
+3. **Challenges** - List with category filters, money highlights, pot emphasis
+4. **Challenge Detail** - Info, stats, leaderboard, pot section, **"Miser" button** linking to betting flow, join/publish CTA
+5. **Betting Flow** - 4-step betting process (Amount > Security > Payment > Confirmation)
+6. **Publish Proof** - Challenge selector, image upload, text
+7. **Leaderboard** - Global rankings with top 3 podium, friends mode
+8. **Profile** - Stats grid, badges, level progression, logout
+9. **Create Challenge** - 4-step flow with pot configuration
+
+## Addiction Engine (NEW)
+- **Money Everywhere**: Total pots displayed on home (18,400€+ en jeu), challenge cards show pot amounts
+- **Social Pressure**: Dynamic messages ("Alex t'a dépassé", "Tu es #X", "Valide ton défi!")
+- **Ranking Widget**: User position, points to next rank, nearby rivals
+- **Daily Triggers**: "VALIDE TON DEFI!" red alert when pending
+- **Streak Pressure**: Warning on streak loss
+- **Badge Advantages**: Earned badges show "+5% XP" bonus
 
 ## Features
 - Google OAuth login
