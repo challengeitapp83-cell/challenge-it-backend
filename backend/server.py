@@ -1067,14 +1067,18 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     
     # Create proof
     media_type = proof_data.media_type or ("image" if proof_data.image else "text")
+    is_cloud_url = proof_data.image and (
+        proof_data.image.startswith("https://res.cloudinary.com") or
+        proof_data.image.startswith("http")
+    )
     proof = Proof(
         user_id=user.user_id,
         user_name=user.name,
         user_picture=user.picture,
         challenge_id=proof_data.challenge_id,
         challenge_title=challenge["title"],
-        image=proof_data.image if media_type == "image" else None,
-        media_url=proof_data.image if media_type == "video" else None,
+        image=proof_data.image if (media_type == "image" or is_cloud_url) else None,
+        media_url=proof_data.image if (media_type == "video" or is_cloud_url) else None,
         media_type=media_type,
         text=proof_data.text,
         day_number=user_challenge["current_day"]

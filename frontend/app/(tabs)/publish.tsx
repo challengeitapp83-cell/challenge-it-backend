@@ -12,27 +12,28 @@ import { Video, ResizeMode } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { api } from '../../contexts/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { COLORS, SPACING, RADIUS, CATEGORIES } from '../../contexts/theme';
+import { COLORS, SPACING, CATEGORIES } from '../../contexts/theme';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const CLOUD = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD || 'ton_cloud_name';
+const PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_PRESET || 'challengeit_upload';
+const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUD}/auto/upload`;
 const PUBLISH_BG = 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=900&h=1200&fit=crop&q=75';
 
 export default function PublishScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { refreshUser } = useAuth();
-  const videoRef = useRef<any>(null);
   const [myChallenges, setMyChallenges] = useState<any[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
-  const [mediaBase64, setMediaBase64] = useState<string | null>(null);
-  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [cloudinaryUrl, setCloudinaryUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => { fetchMyChallenges(); }, []);
 
@@ -41,8 +42,7 @@ export default function PublishScreen() {
       const data = await api.get('/api/my-challenges');
       setMyChallenges(data);
       if (data.length > 0) setSelectedChallenge(data[0].challenge_id);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch {} finally { setLoading(false); }
   };
 
   const pickMedia = async (source: 'camera' | 'library') => {
@@ -51,15 +51,14 @@ export default function PublishScreen() {
       : ImagePicker.requestMediaLibraryPermissionsAsync;
     const { status } = await permFn();
     if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorisez l\'acces pour continuer.');
+      Alert.alert('Permission requise', 'Autorise l\'acces pour continuer.');
       return;
     }
 
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['images', 'videos'],
       allowsEditing: Platform.OS === 'ios',
-      quality: 0.7,
-      base64: true,
+      quality: 0.8,
       videoMaxDuration: 30,
     };
 
@@ -74,62 +73,62 @@ export default function PublishScreen() {
 
     setMediaUri(asset.uri);
     setMediaType(isVideo ? 'video' : 'image');
-    setUploadedUrl(null);
+    setCloudinaryUrl(null);
+    setUploadError(null);
 
-    if (isVideo) {
-      // Upload video file to server
-      await uploadVideoFile(asset.uri);
-    } else {
-      // Use base64 for images
-      if (asset.base64) {
-        setMediaBase64(`data:image/jpeg;base64,${asset.base64}`);
-      }
-    }
+    // Upload to Cloudinary
+    await uploadToCloudinary(asset.uri, isVideo);
   };
 
-  const uploadVideoFile = async (uri: string) => {
+  const uploadToCloudinary = async (uri: string, isVideo: boolean) => {
     setUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
 
     try {
-      const token = await (await import('@react-native-async-storage/async-storage')).default.getItem('session_token');
       const formData = new FormData();
-      const filename = uri.split('/').pop() || 'video.mp4';
-      const ext = filename.split('.').pop()?.toLowerCase() || 'mp4';
-      const mimeType = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+      const filename = uri.split('/').pop() || (isVideo ? 'video.mp4' : 'photo.jpg');
+      const ext = filename.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+
+      let mimeType = 'image/jpeg';
+      if (isVideo) {
+        mimeType = ext === 'mov' ? 'video/quicktime' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+      } else {
+        mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+      }
 
       formData.append('file', {
         uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
         name: filename,
         type: mimeType,
       } as any);
+      formData.append('upload_preset', PRESET);
+      formData.append('folder', 'challengeit');
 
       // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 300);
+      const progressTimer = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 8, 85));
+      }, 400);
 
-      const response = await fetch(`${API_URL}/api/upload-media`, {
+      const response = await fetch(CLOUDINARY_URL, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
         body: formData,
       });
 
-      clearInterval(progressInterval);
+      clearInterval(progressTimer);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `Upload echoue (${response.status})`);
       }
 
       const data = await response.json();
-      setUploadedUrl(data.media_url);
+      setCloudinaryUrl(data.secure_url);
       setUploadProgress(100);
     } catch (e: any) {
-      Alert.alert('Erreur upload', e.message || 'Impossible d\'envoyer la video');
-      clearMedia();
+      console.error('Cloudinary upload error:', e);
+      setUploadError(e.message || 'Echec de l\'envoi');
+      setUploadProgress(0);
     } finally {
       setUploading(false);
     }
@@ -138,14 +137,20 @@ export default function PublishScreen() {
   const clearMedia = () => {
     setMediaUri(null);
     setMediaType(null);
-    setMediaBase64(null);
-    setUploadedUrl(null);
+    setCloudinaryUrl(null);
     setUploadProgress(0);
+    setUploadError(null);
+  };
+
+  const retryUpload = () => {
+    if (mediaUri && mediaType) {
+      uploadToCloudinary(mediaUri, mediaType === 'video');
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedChallenge) { Alert.alert('Erreur', 'Selectionnez un defi'); return; }
-    if (!text.trim()) { Alert.alert('Erreur', 'Ajoutez une description'); return; }
+    if (!selectedChallenge) { Alert.alert('Erreur', 'Selectionne un defi'); return; }
+    if (!text.trim()) { Alert.alert('Erreur', 'Ajoute une description'); return; }
 
     setSubmitting(true);
     try {
@@ -155,24 +160,21 @@ export default function PublishScreen() {
         media_type: mediaType || 'text',
       };
 
-      if (mediaType === 'video' && uploadedUrl) {
-        proofData.image = uploadedUrl;
-        proofData.media_type = 'video';
-      } else if (mediaType === 'image' && mediaBase64) {
-        proofData.image = mediaBase64;
-        proofData.media_type = 'image';
+      if (cloudinaryUrl) {
+        proofData.image = cloudinaryUrl;
+        proofData.media_type = mediaType || 'image';
       }
 
       await api.post('/api/proofs', proofData);
       await refreshUser();
       Alert.alert('Preuve envoyee !', 'Visible par les participants du defi', [
-        { text: 'OK', onPress: () => { router.push('/(tabs)'); } },
+        { text: 'OK', onPress: () => router.push('/(tabs)') },
       ]);
       setText('');
       clearMedia();
     } catch (e: any) {
       const msg = e.message?.includes('already submitted')
-        ? 'Preuve deja soumise aujourd\'hui pour ce defi'
+        ? 'Preuve deja soumise aujourd\'hui'
         : 'Erreur lors de la publication';
       Alert.alert('Erreur', msg);
     } finally { setSubmitting(false); }
@@ -186,10 +188,11 @@ export default function PublishScreen() {
     );
   }
 
+  const canSubmit = text.trim() && !uploading && !submitting && (!mediaUri || cloudinaryUrl);
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[g.container]}>
-        {/* Immersive Background */}
+      <View style={g.container}>
         <Image source={{ uri: PUBLISH_BG }} style={g.bgImg} blurRadius={1} />
         <LinearGradient
           colors={['rgba(0,120,255,0.3)', 'rgba(180,0,255,0.25)', 'rgba(15,15,25,0.72)', COLORS.background]}
@@ -197,19 +200,19 @@ export default function PublishScreen() {
           style={g.bgOverlay}
         />
         <View style={{ paddingTop: insets.top }}>
-        <View style={g.header}>
-          <Text style={g.title}>Publier une preuve</Text>
-          <Text style={g.sub}>Photo ou video - 30s max</Text>
-        </View>
+          <View style={g.header}>
+            <Text style={g.title}>Publier une preuve</Text>
+            <Text style={g.sub}>Photo ou video · 30s max</Text>
+          </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {myChallenges.length === 0 ? (
             <View style={g.empty}>
               <Ionicons name="flag" size={48} color={COLORS.textMuted} />
               <Text style={g.emptyT}>Aucun defi actif</Text>
-              <Text style={g.emptySub}>Rejoignez un defi pour publier des preuves</Text>
-              <TouchableOpacity testID="go-challenges-btn" onPress={() => router.push('/(tabs)/challenges')} style={g.emptyBtn}>
+              <Text style={g.emptySub}>Rejoins un defi pour publier</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/challenges')} style={g.emptyBtn}>
                 <Text style={g.emptyBtnT}>Decouvrir les defis</Text>
               </TouchableOpacity>
             </View>
@@ -223,7 +226,7 @@ export default function PublishScreen() {
                   const isSel = selectedChallenge === uc.challenge_id;
                   const cat = CATEGORIES[ch?.category] || CATEGORIES['Autre'];
                   return (
-                    <TouchableOpacity key={uc.user_challenge_id} testID={`sel-ch-${uc.challenge_id}`}
+                    <TouchableOpacity key={uc.user_challenge_id}
                       onPress={() => setSelectedChallenge(uc.challenge_id)}
                       style={[s.chip, isSel && { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' }]}>
                       <Ionicons name={cat.icon as any} size={16} color={isSel ? COLORS.primary : COLORS.textMuted} />
@@ -233,13 +236,12 @@ export default function PublishScreen() {
                 })}
               </ScrollView>
 
-              {/* Media Section */}
+              {/* Media */}
               <Text style={g.label}>Preuve (photo ou video)</Text>
               {mediaUri ? (
                 <View style={s.preview}>
                   {mediaType === 'video' ? (
                     <Video
-                      ref={videoRef}
                       source={{ uri: mediaUri }}
                       style={s.previewMedia}
                       useNativeControls
@@ -251,44 +253,57 @@ export default function PublishScreen() {
                     <Image source={{ uri: mediaUri }} style={s.previewMedia} />
                   )}
 
-                  {/* Upload progress for video */}
-                  {uploading && (
-                    <View style={s.progressOverlay}>
-                      <View style={s.progressW}>
-                        <View style={[s.progressBar, { width: `${uploadProgress}%` as any }]} />
-                      </View>
-                      <Text style={s.progressT}>Upload {uploadProgress}%</Text>
-                    </View>
-                  )}
-
-                  {/* Media type badge */}
+                  {/* Type badge */}
                   <View style={s.typeBadge}>
                     <Ionicons name={mediaType === 'video' ? 'videocam' : 'image'} size={14} color="#FFF" />
                     <Text style={s.typeT}>{mediaType === 'video' ? 'Video' : 'Photo'}</Text>
                   </View>
 
-                  {/* Remove button */}
-                  <TouchableOpacity testID="remove-media" onPress={clearMedia} style={s.removeBtn}>
+                  {/* Remove */}
+                  <TouchableOpacity onPress={clearMedia} style={s.removeBtn}>
                     <Ionicons name="close-circle" size={32} color="#FF3B30" />
                   </TouchableOpacity>
 
-                  {uploadedUrl && mediaType === 'video' && (
-                    <View style={s.uploadDone}>
-                      <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                      <Text style={s.uploadDoneT}>Video prete</Text>
+                  {/* Upload progress */}
+                  {uploading && (
+                    <View style={s.progressOverlay}>
+                      <ActivityIndicator size="small" color="#FFF" />
+                      <View style={s.progressW}>
+                        <View style={[s.progressBar, { width: `${uploadProgress}%` as any }]} />
+                      </View>
+                      <Text style={s.progressT}>Upload vers Cloudinary {uploadProgress}%</Text>
+                    </View>
+                  )}
+
+                  {/* Upload success */}
+                  {cloudinaryUrl && !uploading && (
+                    <View style={s.successOverlay}>
+                      <Ionicons name="checkmark-circle" size={18} color="#34C759" />
+                      <Text style={s.successT}>Pret a publier</Text>
+                    </View>
+                  )}
+
+                  {/* Upload error */}
+                  {uploadError && !uploading && (
+                    <View style={s.errorOverlay}>
+                      <Ionicons name="alert-circle" size={16} color="#FF3B30" />
+                      <Text style={s.errorT}>{uploadError}</Text>
+                      <TouchableOpacity onPress={retryUpload} style={s.retryBtn}>
+                        <Text style={s.retryT}>Reessayer</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
               ) : (
                 <View style={s.mediaActions}>
-                  <TouchableOpacity testID="take-media" onPress={() => pickMedia('camera')} style={s.mediaBtn}>
+                  <TouchableOpacity onPress={() => pickMedia('camera')} style={s.mediaBtn}>
                     <View style={s.mediaBtnIcon}>
                       <Ionicons name="camera" size={28} color={COLORS.primary} />
                     </View>
                     <Text style={s.mediaBtnT}>Camera</Text>
                     <Text style={s.mediaBtnSub}>Photo ou video</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity testID="pick-media" onPress={() => pickMedia('library')} style={s.mediaBtn}>
+                  <TouchableOpacity onPress={() => pickMedia('library')} style={s.mediaBtn}>
                     <View style={[s.mediaBtnIcon, { backgroundColor: COLORS.secondary + '15' }]}>
                       <Ionicons name="images" size={28} color={COLORS.secondary} />
                     </View>
@@ -300,7 +315,7 @@ export default function PublishScreen() {
 
               {/* Description */}
               <Text style={g.label}>Description</Text>
-              <TextInput testID="proof-text" style={s.input}
+              <TextInput style={s.input}
                 placeholder="Decris ta progression..." placeholderTextColor={COLORS.textMuted}
                 value={text} onChangeText={setText} multiline maxLength={280} />
               <Text style={s.charCount}>{text.length}/280</Text>
@@ -312,15 +327,14 @@ export default function PublishScreen() {
               </View>
 
               {/* Submit */}
-              <TouchableOpacity testID="submit-proof-btn" onPress={handleSubmit}
-                disabled={submitting || uploading || !text.trim()} activeOpacity={0.8} style={s.submitW}>
+              <TouchableOpacity onPress={handleSubmit} disabled={!canSubmit} activeOpacity={0.8} style={s.submitW}>
                 <LinearGradient
-                  colors={text.trim() && !uploading ? ['#007AFF', '#9D4CDD'] : ['#333', '#333']}
+                  colors={canSubmit ? ['#007AFF', '#9D4CDD'] : ['#333', '#333']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
                   {submitting ? <ActivityIndicator color="#FFF" /> : (
                     <>
-                      <Ionicons name="checkmark-circle" size={22} color="#FFF" />
-                      <Text style={s.submitT}>Publier la preuve</Text>
+                      <Ionicons name="checkmark-circle" size={22} color={canSubmit ? '#FFF' : '#555'} />
+                      <Text style={[s.submitT, !canSubmit && { color: '#555' }]}>Publier la preuve</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -333,7 +347,7 @@ export default function PublishScreen() {
   );
 }
 
-const GL = { backgroundColor: 'rgba(20,20,38,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' };
+const GL = { backgroundColor: 'rgba(25,30,60,0.35)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' };
 
 const g = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
@@ -346,7 +360,7 @@ const g = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 60, gap: SPACING.md, paddingHorizontal: SPACING.lg },
   emptyT: { fontSize: 18, fontWeight: '700', color: '#FFF' },
   emptySub: { fontSize: 14, color: COLORS.textMuted, textAlign: 'center' },
-  emptyBtn: { backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: RADIUS.pill, marginTop: SPACING.sm },
+  emptyBtn: { backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: 999, marginTop: SPACING.sm },
   emptyBtnT: { fontSize: 14, fontWeight: '700', color: '#FFF' },
 });
 
@@ -354,30 +368,30 @@ const s = StyleSheet.create({
   challengeRow: { paddingHorizontal: SPACING.lg, gap: SPACING.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, ...GL, marginRight: 8 },
   chipT: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted, maxWidth: 140 },
-  // Media
   mediaActions: { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: SPACING.sm },
-  mediaBtn: { flex: 1, ...GL, borderRadius: 18, paddingVertical: 24, alignItems: 'center', gap: 8, borderStyle: 'dashed' as any },
+  mediaBtn: { flex: 1, ...GL, borderRadius: 18, paddingVertical: 24, alignItems: 'center', gap: 8 },
   mediaBtnIcon: { width: 56, height: 56, borderRadius: 16, backgroundColor: COLORS.primary + '15', justifyContent: 'center', alignItems: 'center' },
   mediaBtnT: { fontSize: 14, fontWeight: '700', color: '#FFF' },
   mediaBtnSub: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
-  // Preview
   preview: { marginHorizontal: SPACING.lg, borderRadius: 18, overflow: 'hidden', position: 'relative', backgroundColor: '#000' },
-  previewMedia: { width: '100%', height: 240, borderRadius: 18 },
+  previewMedia: { width: '100%', height: 260, borderRadius: 18 },
   removeBtn: { position: 'absolute', top: 10, right: 10, zIndex: 10 },
   typeBadge: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   typeT: { fontSize: 12, fontWeight: '700', color: '#FFF' },
-  progressOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, backgroundColor: 'rgba(0,0,0,0.7)' },
-  progressW: { height: 4, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' },
+  progressOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', gap: 8 },
+  progressW: { height: 4, width: '100%', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressBar: { height: '100%', backgroundColor: '#007AFF', borderRadius: 2 },
-  progressT: { fontSize: 12, fontWeight: '700', color: '#FFF', marginTop: 6, textAlign: 'center' },
-  uploadDone: { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  uploadDoneT: { fontSize: 12, fontWeight: '700', color: '#34C759' },
-  // Input
+  progressT: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+  successOverlay: { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  successT: { fontSize: 13, fontWeight: '700', color: '#34C759' },
+  errorOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, backgroundColor: 'rgba(60,0,0,0.9)', flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  errorT: { fontSize: 13, fontWeight: '600', color: '#FF3B30', flex: 1 },
+  retryBtn: { backgroundColor: '#FF3B30', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  retryT: { fontSize: 13, fontWeight: '700', color: '#FFF' },
   input: { ...GL, borderRadius: 16, padding: 16, marginHorizontal: SPACING.lg, color: '#FFF', fontSize: 16, minHeight: 90, textAlignVertical: 'top' },
   charCount: { fontSize: 11, color: COLORS.textMuted, textAlign: 'right', paddingHorizontal: SPACING.lg, marginTop: 4 },
   infoCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: SPACING.lg, marginTop: 14, backgroundColor: COLORS.primary + '08', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.primary + '20' },
   infoT: { fontSize: 12, fontWeight: '600', color: COLORS.primary },
-  // Submit
   submitW: { marginHorizontal: SPACING.lg, borderRadius: 16, overflow: 'hidden', marginTop: SPACING.lg },
   submitGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },
   submitT: { fontSize: 17, fontWeight: '800', color: '#FFF' },

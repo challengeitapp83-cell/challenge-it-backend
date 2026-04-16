@@ -184,9 +184,14 @@ export default function ChallengeDetailScreen() {
 
             {proofs.map((p: any) => {
               const isVideo = p.media_type === 'video';
-              const hasImage = p.image && !p.image.startsWith('/api/media');
-              const hasMediaUrl = p.media_url || (p.image && p.image.startsWith('/api/media'));
-              const mediaSource = hasMediaUrl ? `${API_URL}${p.media_url || p.image}` : null;
+              // Resolve media URL - handle Cloudinary URLs, local URLs, and base64
+              const rawUrl = p.media_url || p.image;
+              const isCloudinary = rawUrl && rawUrl.startsWith('https://');
+              const isLocalApi = rawUrl && rawUrl.startsWith('/api/');
+              const isBase64 = rawUrl && rawUrl.startsWith('data:');
+              const mediaSource = isCloudinary ? rawUrl : isLocalApi ? `${API_URL}${rawUrl}` : null;
+              const imageSource = isCloudinary ? rawUrl : isBase64 ? rawUrl : isLocalApi ? `${API_URL}${rawUrl}` : null;
+              const hasMedia = !!(mediaSource || imageSource);
               const isMe = p.user_id === user?.user_id;
 
               return (
@@ -217,7 +222,7 @@ export default function ChallengeDetailScreen() {
                     </View>
                   </View>
 
-                  {/* Media content - BIGGER and more prominent */}
+                  {/* Media content */}
                   {isVideo && mediaSource ? (
                     <View style={pf.mediaW}>
                       <Video
@@ -228,14 +233,9 @@ export default function ChallengeDetailScreen() {
                         isLooping={false}
                         shouldPlay={false}
                       />
-                      <View style={pf.playOverlay}>
-                        <View style={pf.playBtn}>
-                          <Ionicons name="play" size={24} color="#FFF" />
-                        </View>
-                      </View>
                     </View>
-                  ) : hasImage ? (
-                    <Image source={{ uri: p.image }} style={pf.mediaLarge} />
+                  ) : imageSource ? (
+                    <Image source={{ uri: imageSource }} style={pf.mediaLarge} />
                   ) : null}
 
                   {/* Text */}
