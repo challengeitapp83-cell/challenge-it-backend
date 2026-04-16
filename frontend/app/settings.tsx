@@ -96,9 +96,11 @@ export default function SettingsScreen() {
         {/* Legal */}
         <Text style={sec.title}>Legal</Text>
         <View style={sec.card}>
-          <SettingRow icon="document-text" label="Conditions d'utilisation" onPress={() => Alert.alert('CGU', 'Conditions generales d\'utilisation de Challenge It')} />
+          <SettingRow icon="document-text" label="Conditions d'utilisation" onPress={() => router.push({ pathname: '/legal', params: { page: 'cgu' } })} />
           <Divider />
-          <SettingRow icon="shield-checkmark" label="Politique de confidentialite" onPress={() => Alert.alert('Confidentialite', 'Politique de confidentialite de Challenge It')} />
+          <SettingRow icon="card" label="Politique de paiement" onPress={() => router.push({ pathname: '/legal', params: { page: 'paiement' } })} />
+          <Divider />
+          <SettingRow icon="shield-checkmark" label="Politique de confidentialite" onPress={() => router.push({ pathname: '/legal', params: { page: 'confidentialite' } })} />
           <Divider />
           <SettingRow icon="information-circle" label="A propos" value="v1.0.0" />
         </View>

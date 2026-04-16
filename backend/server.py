@@ -1551,6 +1551,55 @@ async def resolve_proof(proof_id: str, request: Request):
     
     return {"message": f"Preuve {decision}", "proof_id": proof_id}
 
+# ==================== LEGAL & CONSENT ====================
+
+@api_router.post("/legal/accept-terms")
+async def accept_terms(request: Request, user: User = Depends(get_current_user)):
+    """Record user's acceptance of terms, age verification, and risk acknowledgment"""
+    body = await request.json()
+    consent = {
+        "user_id": user.user_id,
+        "terms_accepted": body.get("terms", False),
+        "age_verified": body.get("age_18", False),
+        "risk_acknowledged": body.get("risk", False),
+        "accepted_at": datetime.now(timezone.utc),
+        "version": "1.0",
+    }
+    await db.legal_consents.update_one(
+        {"user_id": user.user_id},
+        {"$set": consent},
+        upsert=True,
+    )
+    return {"message": "Consentement enregistre"}
+
+@api_router.get("/legal/my-consent")
+async def get_my_consent(user: User = Depends(get_current_user)):
+    """Check if user has accepted terms"""
+    consent = await db.legal_consents.find_one({"user_id": user.user_id}, {"_id": 0})
+    if not consent:
+        return {"terms_accepted": False, "age_verified": False, "risk_acknowledged": False}
+    return consent
+
+@api_router.post("/legal/accept-cash-risk")
+async def accept_cash_risk(request: Request, user: User = Depends(get_current_user)):
+    """Record user's acceptance of cash challenge risks for a specific challenge"""
+    body = await request.json()
+    challenge_id = body.get("challenge_id")
+    if not challenge_id:
+        raise HTTPException(status_code=400, detail="challenge_id requis")
+    
+    await db.cash_consents.update_one(
+        {"user_id": user.user_id, "challenge_id": challenge_id},
+        {"$set": {
+            "user_id": user.user_id,
+            "challenge_id": challenge_id,
+            "accepted_at": datetime.now(timezone.utc),
+            "risk_accepted": True,
+        }},
+        upsert=True,
+    )
+    return {"message": "Risques acceptes"}
+
 # ==================== CHALLENGE COMPLETION ====================
 
 @api_router.post("/challenges/{challenge_id}/complete")
