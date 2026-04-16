@@ -1,146 +1,252 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  StyleSheet, Alert,
+  StyleSheet, Alert, Animated, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
-import { COLORS, SPACING, RADIUS, BADGE_CONFIG } from '../../contexts/theme';
+import { api } from '../../contexts/api';
+import { COLORS, BADGE_CONFIG, CATEGORIES, getChallengeImage } from '../../contexts/theme';
+
+const BG = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&h=400&fit=crop&q=70';
+
+function Fade({ delay = 0, children }: { delay?: number; children: React.ReactNode }) {
+  const o = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(16)).current;
+  useEffect(() => { Animated.parallel([Animated.timing(o, { toValue: 1, duration: 400, delay, useNativeDriver: true }), Animated.timing(y, { toValue: 0, duration: 400, delay, useNativeDriver: true })]).start(); }, []);
+  return <Animated.View style={{ opacity: o, transform: [{ translateY: y }] }}>{children}</Animated.View>;
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    Alert.alert('Déconnexion', 'Êtes-vous sûr ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Déconnexion', style: 'destructive', onPress: logout },
-    ]);
-  };
+  useEffect(() => {
+    (async () => {
+      try {
+        const [s, h, f] = await Promise.all([
+          api.get('/api/users/me/stats').catch(() => null),
+          api.get('/api/users/me/history').catch(() => []),
+          api.get('/api/friends').catch(() => []),
+        ]);
+        setStats(s); setHistory(h); setFriends(f);
+      } catch {} finally { setLoading(false); }
+    })();
+  }, []);
 
-  const stats = [
-    { icon: 'star', color: COLORS.primary, value: user?.points || 0, label: 'Points' },
-    { icon: 'flame', color: '#FF6B35', value: user?.streak || 0, label: 'Streak' },
-    { icon: 'trophy', color: COLORS.warning, value: user?.level || 1, label: 'Niveau' },
-    { icon: 'heart', color: COLORS.secondary, value: user?.reputation || 0, label: 'Réputation' },
-  ];
-
-  const progressPct = ((user?.points || 0) % 100);
+  const xpPct = (user?.points || 0) % 100;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Profile Header with gradient bg */}
-        <LinearGradient colors={['#007AFF15', '#9D4CDD10', COLORS.background]} style={styles.profileBg}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarWrap}>
-              {user?.picture ? (
-                <Image source={{ uri: user.picture }} style={styles.avatar} />
-              ) : (
-                <LinearGradient colors={['#007AFF', '#9D4CDD']} style={styles.avatar}>
-                  <Text style={styles.avatarInitial}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
-                </LinearGradient>
-              )}
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelNum}>{user?.level || 1}</Text>
+    <View style={g.root}>
+      {/* Hero BG */}
+      <Image source={{ uri: BG }} style={g.bg} blurRadius={8} />
+      <LinearGradient colors={['rgba(15,15,15,0.4)', 'rgba(15,15,15,0.9)', '#0F0F0F']} locations={[0, 0.35, 0.55]} style={g.ov} />
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingTop: insets.top }}>
+        {/* ===== PROFILE HEADER ===== */}
+        <Fade>
+          <View style={hd.w}>
+            <View style={hd.avWrap}>
+              {user?.picture ? <Image source={{ uri: user.picture }} style={hd.av} /> :
+                <LinearGradient colors={['#007AFF', '#9D4CDD']} style={hd.av}><Text style={hd.avI}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text></LinearGradient>}
+              <View style={hd.lvl}><Text style={hd.lvlN}>{user?.level || 1}</Text></View>
+            </View>
+            <Text style={hd.name}>{user?.name || 'Challenger'}</Text>
+            <Text style={hd.email}>{user?.email}</Text>
+            {user?.bio ? <Text style={hd.bio}>{user.bio}</Text> : null}
+            {/* XP Bar */}
+            <View style={hd.xpW}>
+              <View style={hd.xpRow}>
+                <Text style={hd.xpLbl}>Niveau {user?.level || 1}</Text>
+                <Text style={hd.xpVal}>{xpPct}/100 XP</Text>
+              </View>
+              <View style={hd.xpBg}>
+                <LinearGradient colors={['#007AFF', '#9D4CDD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={[hd.xpFill, { width: `${Math.max(xpPct, 3)}%` as any }]} />
               </View>
             </View>
-            <Text style={styles.name}>{user?.name || 'Challenger'}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
           </View>
-        </LinearGradient>
+        </Fade>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          {stats.map((s, i) => (
-            <View key={i} style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: s.color + '18' }]}>
-                <Ionicons name={s.icon as any} size={20} color={s.color} />
+        {/* ===== STATS GRID ===== */}
+        <Fade delay={80}>
+          <View style={st.grid}>
+            {[
+              { icon: 'star', c: COLORS.primary, v: user?.points || 0, l: 'XP Total' },
+              { icon: 'flame', c: '#FF6B35', v: user?.streak || 0, l: 'Streak' },
+              { icon: 'trophy', c: COLORS.warning, v: stats?.challenges_won || 0, l: 'Gagnés' },
+              { icon: 'close-circle', c: '#FF3B30', v: stats?.challenges_lost || 0, l: 'Perdus' },
+              { icon: 'cash', c: COLORS.success, v: `${user?.total_earnings || 0}€`, l: 'Gains' },
+              { icon: 'people', c: COLORS.secondary, v: friends.length, l: 'Amis' },
+              { icon: 'checkmark-done', c: '#5AC8FA', v: stats?.proofs_submitted || 0, l: 'Preuves' },
+              { icon: 'heart', c: '#FF2D55', v: user?.reputation || 0, l: 'Réputation' },
+            ].map((s2, i) => (
+              <View key={i} style={st.card}>
+                <Ionicons name={s2.icon as any} size={18} color={s2.c} />
+                <Text style={st.val}>{s2.v}</Text>
+                <Text style={st.lbl}>{s2.l}</Text>
               </View>
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        </Fade>
 
-        {/* Badges */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mes Badges</Text>
-          <View style={styles.badgeGrid}>
-            {Object.entries(BADGE_CONFIG).map(([id, badge]) => {
-              const earned = user?.badges?.includes(id);
-              return (
-                <View key={id} style={[styles.badgeItem, !earned && { opacity: 0.3 }]}>
-                  <View style={[styles.badgeCircle, earned && { borderColor: badge.color }]}>
-                    <Ionicons name={badge.icon as any} size={22} color={earned ? badge.color : COLORS.textMuted} />
+        {/* ===== BADGES ===== */}
+        <Fade delay={150}>
+          <View style={sec.w}>
+            <Text style={sec.t}>Badges ({user?.badges?.length || 0}/6)</Text>
+            <View style={bd.grid}>
+              {Object.entries(BADGE_CONFIG).map(([id, b]) => {
+                const earned = user?.badges?.includes(id);
+                return (
+                  <View key={id} style={[bd.item, !earned && { opacity: 0.25 }]}>
+                    <View style={[bd.circle, earned && { borderColor: b.color }]}>
+                      <Ionicons name={b.icon as any} size={22} color={earned ? b.color : COLORS.textMuted} />
+                    </View>
+                    <Text style={[bd.label, earned && { color: '#FFF' }]}>{b.label}</Text>
                   </View>
-                  <Text style={[styles.badgeLabel, earned && { color: '#FFF' }]}>{badge.label}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Progress */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Progression</Text>
-          <View style={styles.progressCard}>
-            <View style={styles.progressTop}>
-              <Text style={styles.progressLabel}>Niveau {user?.level || 1}</Text>
-              <Text style={styles.progressLabel}>{progressPct}/100 pts</Text>
+                );
+              })}
             </View>
-            <View style={styles.progressBg}>
-              <LinearGradient colors={[COLORS.primary, COLORS.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[styles.progressFill, { width: `${Math.max(progressPct, 2)}%` as any }]} />
-            </View>
-            <Text style={styles.progressHint}>{100 - progressPct} points pour le niveau suivant</Text>
           </View>
-        </View>
+        </Fade>
 
-        {/* Logout */}
-        <View style={styles.section}>
-          <TouchableOpacity testID="logout-btn" onPress={handleLogout} style={styles.logoutBtn}>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-            <Text style={styles.logoutText}>Se déconnecter</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ===== FRIENDS ===== */}
+        <Fade delay={220}>
+          <View style={sec.w}>
+            <View style={sec.hRow}><Text style={sec.t}>Amis ({friends.length})</Text></View>
+            {friends.length === 0 ? (
+              <View style={fr.empty}><Ionicons name="people-outline" size={28} color={COLORS.textMuted} /><Text style={fr.emptyT}>Invite tes amis à relever des défis !</Text></View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}>
+                {friends.map((f: any) => (
+                  <View key={f.user_id} style={fr.card}>
+                    {f.picture ? <Image source={{ uri: f.picture }} style={fr.av} /> :
+                      <LinearGradient colors={['#007AFF', '#9D4CDD']} style={fr.av}><Text style={fr.avI}>{f.name?.charAt(0)}</Text></LinearGradient>}
+                    <Text style={fr.name} numberOfLines={1}>{f.name?.split(' ')[0]}</Text>
+                    <Text style={fr.pts}>{f.points} pts</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </Fade>
+
+        {/* ===== HISTORY ===== */}
+        <Fade delay={290}>
+          <View style={sec.w}>
+            <Text style={sec.t}>Historique</Text>
+            {history.length === 0 ? (
+              <View style={fr.empty}><Ionicons name="time-outline" size={28} color={COLORS.textMuted} /><Text style={fr.emptyT}>Aucun défi terminé</Text></View>
+            ) : (
+              history.slice(0, 5).map((h: any) => {
+                const ch = h.challenge;
+                const cat = CATEGORIES[ch?.category] || CATEGORIES['Autre'];
+                const img = getChallengeImage(ch?.challenge_id, ch?.category, ch?.image);
+                return (
+                  <TouchableOpacity key={h.user_challenge_id} onPress={() => router.push(`/challenge/${ch?.challenge_id}`)} style={hi.card} activeOpacity={0.8}>
+                    <Image source={{ uri: img }} style={hi.img} />
+                    <View style={hi.body}>
+                      <Text style={hi.title} numberOfLines={1}>{ch?.title}</Text>
+                      <View style={hi.meta}><View style={[hi.catPill, { backgroundColor: cat.color + '20' }]}><Text style={[hi.catT, { color: cat.color }]}>{ch?.category}</Text></View>
+                        <Text style={hi.days}>Jour {h.completed_days}/{ch?.duration_days}</Text></View>
+                    </View>
+                    <View style={h.is_completed ? hi.doneBadge : hi.activeBadge}>
+                      <Ionicons name={h.is_completed ? 'checkmark' : 'time-outline'} size={14} color={h.is_completed ? COLORS.success : COLORS.warning} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
+        </Fade>
+
+        {/* ===== ACTIONS ===== */}
+        <Fade delay={360}>
+          <View style={act.w}>
+            <TouchableOpacity testID="logout-btn" onPress={() => Alert.alert('Déconnexion', 'Êtes-vous sûr ?', [{ text: 'Annuler', style: 'cancel' }, { text: 'Déconnexion', style: 'destructive', onPress: logout }])} style={act.btn}>
+              <Ionicons name="log-out-outline" size={20} color="#FF3B30" /><Text style={act.btnT}>Se déconnecter</Text>
+            </TouchableOpacity>
+          </View>
+        </Fade>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  profileBg: { paddingBottom: 24 },
-  profileHeader: { alignItems: 'center', paddingTop: 32 },
-  avatarWrap: { position: 'relative', marginBottom: 14 },
-  avatar: { width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.primary },
-  avatarInitial: { fontSize: 40, fontWeight: '800', color: '#FFF' },
-  levelBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.primary, borderRadius: 15, width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.background },
-  levelNum: { fontSize: 13, fontWeight: '900', color: '#FFF' },
-  name: { fontSize: 26, fontWeight: '800', color: '#FFF', letterSpacing: -0.5 },
-  email: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 24 },
-  statCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 14, paddingVertical: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.border },
-  statIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '900', color: '#FFF' },
-  statLabel: { fontSize: 10, fontWeight: '700', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 19, fontWeight: '800', color: '#FFF', marginBottom: 14 },
-  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  badgeItem: { alignItems: 'center', width: 72 },
-  badgeCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.card, borderWidth: 2, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  badgeLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textMuted, textAlign: 'center' },
-  progressCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.border },
-  progressTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressLabel: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  progressBg: { height: 10, backgroundColor: '#2C2C2E', borderRadius: 5, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 5 },
-  progressHint: { fontSize: 12, color: COLORS.textMuted, marginTop: 10, textAlign: 'center' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 1, borderColor: COLORS.error + '25' },
-  logoutText: { fontSize: 16, fontWeight: '600', color: COLORS.error },
+const GL = { backgroundColor: 'rgba(22,22,36,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' };
+const g = StyleSheet.create({ root: { flex: 1, backgroundColor: '#0F0F0F' }, bg: { position: 'absolute', top: 0, left: 0, right: 0, height: 300, width: '100%' }, ov: { position: 'absolute', top: 0, left: 0, right: 0, height: 300 } });
+
+const hd = StyleSheet.create({
+  w: { alignItems: 'center', paddingTop: 24, paddingBottom: 16, paddingHorizontal: 20 },
+  avWrap: { position: 'relative', marginBottom: 14 },
+  av: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: COLORS.primary },
+  avI: { fontSize: 36, fontWeight: '800', color: '#FFF' },
+  lvl: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.primary, borderRadius: 14, width: 28, height: 28, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#0F0F0F' },
+  lvlN: { fontSize: 12, fontWeight: '900', color: '#FFF' },
+  name: { fontSize: 24, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
+  email: { fontSize: 13, color: COLORS.textMuted, marginTop: 3 },
+  bio: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
+  xpW: { ...GL, borderRadius: 14, padding: 12, marginTop: 16, width: '100%' },
+  xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  xpLbl: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  xpVal: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
+  xpBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
+  xpFill: { height: '100%', borderRadius: 3 },
+});
+
+const st = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, marginBottom: 24 },
+  card: { width: '23%' as any, ...GL, borderRadius: 14, paddingVertical: 12, alignItems: 'center', gap: 3, flexGrow: 1, flexBasis: '22%' as any },
+  val: { fontSize: 18, fontWeight: '900', color: '#FFF' },
+  lbl: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: 0.5 },
+});
+
+const sec = StyleSheet.create({
+  w: { marginBottom: 24, paddingHorizontal: 20 },
+  hRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  t: { fontSize: 18, fontWeight: '800', color: '#FFF', marginBottom: 12 },
+});
+
+const bd = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  item: { alignItems: 'center', width: 66 },
+  circle: { width: 52, height: 52, borderRadius: 26, ...GL, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  label: { fontSize: 9, fontWeight: '600', color: COLORS.textMuted, textAlign: 'center' },
+});
+
+const fr = StyleSheet.create({
+  empty: { ...GL, borderRadius: 14, padding: 20, alignItems: 'center', gap: 8 },
+  emptyT: { fontSize: 13, fontWeight: '500', color: COLORS.textMuted },
+  card: { alignItems: 'center', width: 72, marginRight: 10, gap: 4 },
+  av: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  avI: { fontSize: 18, fontWeight: '800', color: '#FFF' },
+  name: { fontSize: 11, fontWeight: '700', color: '#FFF' },
+  pts: { fontSize: 10, fontWeight: '600', color: COLORS.textMuted },
+});
+
+const hi = StyleSheet.create({
+  card: { flexDirection: 'row', ...GL, borderRadius: 14, overflow: 'hidden', marginBottom: 8, alignItems: 'center' },
+  img: { width: 60, height: 60 },
+  body: { flex: 1, padding: 10, gap: 4 },
+  title: { fontSize: 14, fontWeight: '700', color: '#FFF' },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  catPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  catT: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
+  days: { fontSize: 11, fontWeight: '500', color: COLORS.textMuted },
+  doneBadge: { marginRight: 12 },
+  activeBadge: { marginRight: 12 },
+});
+
+const act = StyleSheet.create({
+  w: { paddingHorizontal: 20 },
+  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, ...GL, borderRadius: 14, borderColor: '#FF3B3020' },
+  btnT: { fontSize: 15, fontWeight: '600', color: '#FF3B30' },
 });

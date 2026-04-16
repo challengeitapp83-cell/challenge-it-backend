@@ -10,9 +10,19 @@ import { useRouter } from 'expo-router';
 import { api } from '../contexts/api';
 import { COLORS, SPACING, RADIUS, CATEGORIES } from '../contexts/theme';
 
-const CATEGORY_LIST = ['Sport', 'Santé', 'Habitudes', 'Business', 'Autre'];
+const CATEGORY_LIST = ['Sport', 'Business', 'Argent', 'Discipline', 'Santé', 'Social', 'Général'];
 const DURATIONS = [7, 14, 21, 30, 60, 90];
 const POT_AMOUNTS = [5, 10, 20, 50, 100];
+const DIFFICULTIES = [
+  { id: 'facile', label: 'Facile', icon: 'sunny', color: COLORS.success },
+  { id: 'moyen', label: 'Moyen', icon: 'flame', color: COLORS.warning },
+  { id: 'hardcore', label: 'Hardcore', icon: 'skull', color: '#FF3B30' },
+];
+const VALIDATIONS = [
+  { id: 'manual', label: 'Manuelle', icon: 'hand-left' },
+  { id: 'photo', label: 'Photo', icon: 'camera' },
+  { id: 'video', label: 'Vidéo', icon: 'videocam' },
+];
 
 export default function CreateChallengeScreen() {
   const insets = useSafeAreaInsets();
@@ -22,6 +32,8 @@ export default function CreateChallengeScreen() {
   const [category, setCategory] = useState('Sport');
   const [duration, setDuration] = useState(30);
   const [challengeType, setChallengeType] = useState<'community' | 'friends'>('community');
+  const [difficulty, setDifficulty] = useState('moyen');
+  const [validationType, setValidationType] = useState('manual');
   const [hasPot, setHasPot] = useState(false);
   const [potAmount, setPotAmount] = useState(10);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +48,8 @@ export default function CreateChallengeScreen() {
         description: description.trim(),
         category,
         duration_days: duration,
+        difficulty,
+        validation_type: validationType,
         challenge_type: challengeType,
         has_pot: hasPot,
         pot_amount_per_person: hasPot ? potAmount : 0,
@@ -147,6 +161,28 @@ export default function CreateChallengeScreen() {
           </View>
 
           {/* ===== CAGNOTTE (POT) ===== */}
+          <Text style={styles.label}>Difficulté</Text>
+          <View style={styles.chipRow}>
+            {DIFFICULTIES.map((d) => (
+              <TouchableOpacity key={d.id} testID={`diff-${d.id}`} onPress={() => setDifficulty(d.id)}
+                style={[styles.chip, difficulty === d.id && { borderColor: d.color, backgroundColor: d.color + '15' }]}>
+                <Ionicons name={d.icon as any} size={16} color={difficulty === d.id ? d.color : COLORS.textMuted} />
+                <Text style={[styles.chipText, difficulty === d.id && { color: d.color }]}>{d.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Validation</Text>
+          <View style={styles.chipRow}>
+            {VALIDATIONS.map((v) => (
+              <TouchableOpacity key={v.id} testID={`val-${v.id}`} onPress={() => setValidationType(v.id)}
+                style={[styles.chip, validationType === v.id && { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' }]}>
+                <Ionicons name={v.icon as any} size={16} color={validationType === v.id ? COLORS.primary : COLORS.textMuted} />
+                <Text style={[styles.chipText, validationType === v.id && { color: COLORS.primary }]}>{v.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <Text style={styles.label}>Cagnotte</Text>
           <TouchableOpacity testID="toggle-pot" onPress={() => setHasPot(!hasPot)} style={styles.potToggle}>
             <View style={styles.potToggleLeft}>

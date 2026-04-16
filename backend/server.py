@@ -47,34 +47,45 @@ class User(BaseModel):
     email: str
     name: str
     picture: Optional[str] = None
+    bio: str = ""
     level: int = 1
     points: int = 0
     streak: int = 0
     reputation: int = 0
     badges: List[str] = []
     joined_challenges: List[str] = []
+    challenges_won: int = 0
+    challenges_lost: int = 0
+    total_earnings: float = 0
+    friends: List[str] = []
+    referral_code: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Challenge(BaseModel):
     challenge_id: str = Field(default_factory=lambda: f"challenge_{uuid.uuid4().hex[:12]}")
     title: str
     description: str
-    category: str  # Sport, Santé, Habitudes, Business, Autre
+    category: str  # Sport, Business, Argent, Discipline, Santé, Social, Général
     duration_days: int
+    difficulty: str = "moyen"  # facile, moyen, hardcore
+    validation_type: str = "manual"  # manual, photo, video, auto
+    location: str = "monde"  # ville, pays, monde
     is_public: bool = True
-    challenge_type: str = "community"  # "community" or "friends"
+    challenge_type: str = "community"  # "community", "friends", "solo", "random"
     invite_code: Optional[str] = None
     creator_id: str
     creator_name: str
     participants: List[str] = []
     participant_count: int = 0
+    max_participants: int = 0  # 0 = unlimited
     # Pot system (simulated MVP)
     has_pot: bool = False
     pot_amount_per_person: float = 0
     pot_total: float = 0
-    pot_contributions: List[str] = []  # user_ids who contributed
+    pot_contributions: List[str] = []
     winner_id: Optional[str] = None
     winner_name: Optional[str] = None
+    platform_commission: float = 0  # 10% of pot
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     image: Optional[str] = None
 
@@ -83,10 +94,14 @@ class ChallengeCreate(BaseModel):
     description: str
     category: str
     duration_days: int
+    difficulty: str = "moyen"
+    validation_type: str = "manual"
+    location: str = "monde"
     is_public: bool = True
-    challenge_type: str = "community"  # "community" or "friends"
+    challenge_type: str = "community"
     has_pot: bool = False
     pot_amount_per_person: float = 0
+    max_participants: int = 0
     image: Optional[str] = None
 
 class UserChallenge(BaseModel):
@@ -325,6 +340,9 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
         description=challenge_data.description,
         category=challenge_data.category,
         duration_days=challenge_data.duration_days,
+        difficulty=challenge_data.difficulty,
+        validation_type=challenge_data.validation_type,
+        location=challenge_data.location,
         is_public=is_public,
         challenge_type=challenge_data.challenge_type,
         invite_code=invite_code,
@@ -332,6 +350,8 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
         creator_name=user.name,
         has_pot=challenge_data.has_pot,
         pot_amount_per_person=challenge_data.pot_amount_per_person,
+        platform_commission=challenge_data.pot_amount_per_person * 0.1 if challenge_data.has_pot else 0,
+        max_participants=challenge_data.max_participants,
         image=challenge_data.image
     )
     await db.challenges.insert_one(challenge.dict())
@@ -450,7 +470,6 @@ async def contribute_pot(challenge_id: str, user: User = Depends(get_current_use
 @api_router.get("/my-friends-challenges")
 async def get_my_friends_challenges(user: User = Depends(get_current_user)):
     """Get private/friends challenges the user is in or was invited to"""
-    # Challenges user created or joined that are friends type
     joined_ids = user.joined_challenges or []
     challenges = await db.challenges.find(
         {"$or": [
@@ -460,6 +479,92 @@ async def get_my_friends_challenges(user: User = Depends(get_current_user)):
         {"_id": 0}
     ).sort("created_at", -1).to_list(50)
     return challenges
+
+# ==================== FRIEND SYSTEM ====================
+
+@api_router.post("/friends/add")
+async def add_friend(request: Request, user: User = Depends(get_current_user)):
+    """Add a friend by user_id"""
+    body = await request.json()
+    friend_id = body.get("friend_id")
+    if not friend_id or friend_id == user.user_id:
+        raise HTTPException(status_code=400, detail="ID invalide")
+    
+    friend = await db.users.find_one({"user_id": friend_id}, {"_id": 0})
+    if not friend:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    
+    if friend_id in (user.friends or []):
+        raise HTTPException(status_code=400, detail="Déjà ami")
+    
+    # Add mutual friendship
+    await db.users.update_one({"user_id": user.user_id}, {"$addToSet": {"friends": friend_id}})
+    await db.users.update_one({"user_id": friend_id}, {"$addToSet": {"friends": user.user_id}})
+    return {"message": f"Ami ajouté : {friend.get('name')}"}
+
+@api_router.get("/friends")
+async def get_friends(user: User = Depends(get_current_user)):
+    """Get user's friends list"""
+    friend_ids = user.friends or []
+    if not friend_ids:
+        return []
+    friends = await db.users.find(
+        {"user_id": {"$in": friend_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "streak": 1}
+    ).to_list(100)
+    return friends
+
+@api_router.get("/friends/leaderboard")
+async def get_friends_leaderboard(user: User = Depends(get_current_user)):
+    """Get leaderboard of friends only"""
+    friend_ids = (user.friends or []) + [user.user_id]
+    friends = await db.users.find(
+        {"user_id": {"$in": friend_ids}},
+        {"_id": 0, "user_id": 1, "name": 1, "picture": 1, "level": 1, "points": 1, "streak": 1}
+    ).sort("points", -1).to_list(50)
+    return friends
+
+@api_router.put("/users/me/bio")
+async def update_bio(request: Request, user: User = Depends(get_current_user)):
+    """Update user bio"""
+    body = await request.json()
+    bio = body.get("bio", "")[:200]
+    await db.users.update_one({"user_id": user.user_id}, {"$set": {"bio": bio}})
+    return {"message": "Bio mise à jour"}
+
+@api_router.get("/users/me/stats")
+async def get_my_stats(user: User = Depends(get_current_user)):
+    """Get detailed user stats"""
+    total_challenges = len(user.joined_challenges or [])
+    completed = await db.user_challenges.count_documents({"user_id": user.user_id, "is_completed": True})
+    active_count = await db.user_challenges.count_documents({"user_id": user.user_id, "is_completed": False})
+    proof_count = await db.proofs.count_documents({"user_id": user.user_id})
+    
+    return {
+        "total_challenges": total_challenges,
+        "completed": completed,
+        "active": active_count,
+        "proofs_submitted": proof_count,
+        "challenges_won": user.challenges_won,
+        "challenges_lost": user.challenges_lost,
+        "total_earnings": user.total_earnings,
+        "friends_count": len(user.friends or []),
+        "badges_count": len(user.badges or []),
+    }
+
+@api_router.get("/users/me/history")
+async def get_challenge_history(user: User = Depends(get_current_user)):
+    """Get user's challenge history"""
+    user_challenges = await db.user_challenges.find(
+        {"user_id": user.user_id}, {"_id": 0}
+    ).sort("start_date", -1).limit(20).to_list(20)
+    
+    result = []
+    for uc in user_challenges:
+        ch = await db.challenges.find_one({"challenge_id": uc["challenge_id"]}, {"_id": 0})
+        if ch:
+            result.append({**uc, "challenge": ch})
+    return result
 
 @api_router.post("/challenges/{challenge_id}/join")
 async def join_challenge(challenge_id: str, user: User = Depends(get_current_user)):

@@ -3,9 +3,13 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 // Category configuration
 export const CATEGORIES: Record<string, { color: string; icon: string; iconSet: 'ion' | 'mci' }> = {
   'Sport': { color: '#007AFF', icon: 'fitness', iconSet: 'ion' },
-  'Santé': { color: '#32D74B', icon: 'heart', iconSet: 'ion' },
-  'Habitudes': { color: '#9D4CDD', icon: 'time', iconSet: 'ion' },
   'Business': { color: '#FFD700', icon: 'briefcase', iconSet: 'ion' },
+  'Argent': { color: '#32D74B', icon: 'cash', iconSet: 'ion' },
+  'Discipline': { color: '#FF6B35', icon: 'flame', iconSet: 'ion' },
+  'Santé': { color: '#32D74B', icon: 'heart', iconSet: 'ion' },
+  'Social': { color: '#AF52DE', icon: 'people', iconSet: 'ion' },
+  'Habitudes': { color: '#9D4CDD', icon: 'time', iconSet: 'ion' },
+  'Général': { color: '#A1A1AA', icon: 'star', iconSet: 'ion' },
   'Autre': { color: '#A1A1AA', icon: 'star', iconSet: 'ion' },
 };
 
