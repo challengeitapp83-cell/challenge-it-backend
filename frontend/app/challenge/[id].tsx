@@ -113,6 +113,38 @@ export default function ChallengeDetailScreen() {
           <Text style={styles.description}>{challenge.description}</Text>
         </View>
 
+        {/* ===== GAINS CALCULATOR (CONVERSION) ===== */}
+        {challenge.has_pot && challenge.pot_amount_per_person > 0 && (
+          <View style={gc.w}>
+            <LinearGradient colors={['#1A1200', '#0F0A00']} style={gc.bg} />
+            <View style={gc.glowLine} />
+            <Text style={gc.title}>TU PEUX GAGNER</Text>
+            <Text style={gc.amount}>
+              {Math.floor(challenge.pot_total * 0.9)}€
+            </Text>
+            <Text style={gc.sub}>si tu tiens {challenge.duration_days} jours</Text>
+            <View style={gc.row}>
+              <View style={gc.item}>
+                <Text style={gc.itemLabel}>Ta mise</Text>
+                <Text style={gc.itemVal}>{challenge.pot_amount_per_person}€</Text>
+              </View>
+              <View style={gc.divider} />
+              <View style={gc.item}>
+                <Text style={gc.itemLabel}>Cagnotte</Text>
+                <Text style={[gc.itemVal, { color: '#FFD700' }]}>{challenge.pot_total}€</Text>
+              </View>
+              <View style={gc.divider} />
+              <View style={gc.item}>
+                <Text style={gc.itemLabel}>Joueurs</Text>
+                <Text style={gc.itemVal}>{challenge.participant_count}</Text>
+              </View>
+            </View>
+            {!isJoined && (
+              <Text style={gc.warn}>Les perdants financent les gagnants</Text>
+            )}
+          </View>
+        )}
+
         {/* Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -619,4 +651,20 @@ const pf = StyleSheet.create({
   publishCtaInner: { alignItems: 'center', paddingVertical: 20, gap: 6 },
   publishCtaT: { fontSize: 17, fontWeight: '800', color: '#FFF' },
   publishCtaSub: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.55)' },
+});
+
+// Gains calculator styles
+const gc = StyleSheet.create({
+  w: { marginHorizontal: 16, marginBottom: 16, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)', position: 'relative' },
+  bg: { ...StyleSheet.absoluteFillObject },
+  glowLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: '#FFD700' },
+  title: { fontSize: 11, fontWeight: '800', color: 'rgba(255,215,0,0.5)', letterSpacing: 2, textAlign: 'center', marginTop: 18 },
+  amount: { fontSize: 42, fontWeight: '900', color: '#FFD700', textAlign: 'center', marginTop: 4 },
+  sub: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: 2 },
+  row: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 18, marginBottom: 16, paddingHorizontal: 16 },
+  item: { alignItems: 'center', gap: 4 },
+  itemLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
+  itemVal: { fontSize: 20, fontWeight: '900', color: '#FFF' },
+  divider: { width: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  warn: { fontSize: 12, fontWeight: '700', color: '#FF3B30', textAlign: 'center', paddingBottom: 16, fontStyle: 'italic' },
 });

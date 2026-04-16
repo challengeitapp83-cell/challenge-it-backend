@@ -1239,6 +1239,88 @@ async def like_proof(proof_id: str, user: User = Depends(get_current_user)):
         )
         return {"liked": True}
 
+# ==================== CHALLENGE COMPLETION ====================
+
+@api_router.post("/challenges/{challenge_id}/complete")
+async def complete_challenge(challenge_id: str, user: User = Depends(get_current_user)):
+    """Mark a challenge as completed for user - calculate win/loss"""
+    uc = await db.user_challenges.find_one(
+        {"user_id": user.user_id, "challenge_id": challenge_id}, {"_id": 0}
+    )
+    if not uc:
+        raise HTTPException(status_code=404, detail="Challenge pas rejoint")
+    
+    ch = await db.challenges.find_one({"challenge_id": challenge_id}, {"_id": 0})
+    if not ch:
+        raise HTTPException(status_code=404, detail="Challenge introuvable")
+    
+    completed_days = uc.get("completed_days", 0)
+    total_days = ch.get("duration_days", 7)
+    won = completed_days >= total_days
+    
+    # Update user challenge
+    await db.user_challenges.update_one(
+        {"user_challenge_id": uc["user_challenge_id"]},
+        {"$set": {"is_completed": True, "won": won}}
+    )
+    
+    # Update user stats
+    if won:
+        xp_reward = total_days * 10
+        await db.users.update_one(
+            {"user_id": user.user_id},
+            {"$inc": {"points": xp_reward, "challenges_won": 1}}
+        )
+        
+        # Calculate winnings if pot exists
+        winnings = 0
+        if ch.get("has_pot") and ch.get("pot_total", 0) > 0:
+            # Count winners
+            all_uc = await db.user_challenges.find(
+                {"challenge_id": challenge_id, "is_completed": True, "won": True},
+                {"_id": 0}
+            ).to_list(100)
+            num_winners = max(len(all_uc), 1)
+            net_pot = ch["pot_total"] * 0.9  # 10% commission
+            winnings = round(net_pot / num_winners, 2)
+            await db.users.update_one(
+                {"user_id": user.user_id},
+                {"$inc": {"total_earnings": winnings}}
+            )
+        
+        await _create_notification(user.user_id, "challenge_win",
+            f"Tu as gagne le defi \"{ch.get('title')}\" !",
+            {"challenge_id": challenge_id, "xp": xp_reward, "winnings": winnings, "icon": "trophy", "color": "#FFD700"}
+        )
+        
+        return {
+            "status": "won",
+            "xp_earned": xp_reward,
+            "winnings": winnings,
+            "completed_days": completed_days,
+            "total_days": total_days,
+            "message": f"Bravo ! Tu as gagne {winnings}€" if winnings > 0 else "Defi complete !",
+        }
+    else:
+        await db.users.update_one(
+            {"user_id": user.user_id},
+            {"$inc": {"challenges_lost": 1}}
+        )
+        
+        await _create_notification(user.user_id, "challenge_lost",
+            f"Tu as perdu le defi \"{ch.get('title')}\"",
+            {"challenge_id": challenge_id, "icon": "sad", "color": "#FF3B30"}
+        )
+        
+        return {
+            "status": "lost",
+            "xp_earned": 0,
+            "winnings": 0,
+            "completed_days": completed_days,
+            "total_days": total_days,
+            "message": "Tu as perdu ce defi. Relance-toi !",
+        }
+
 # ==================== CHALLENGE TEMPLATES ====================
 
 CHALLENGE_TEMPLATES = [
