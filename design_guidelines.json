@@ -1,0 +1,111 @@
+{
+  "theme": "Dark Mode",
+  "archetype": "Electric & Neon",
+  "project_type": "react_native_expo",
+  "design_system": {
+    "colors": {
+      "background": "#0F0F0F",
+      "card": "#1E1E1E",
+      "primary": "#007AFF",
+      "secondary": "#9D4CDD",
+      "success": "#32D74B",
+      "warning": "#FFD700",
+      "text_primary": "#FFFFFF",
+      "text_secondary": "#A1A1AA",
+      "border": "#27272A",
+      "tab_bar": "#121212"
+    },
+    "typography": {
+      "instructions": "Use @expo-google-fonts/outfit for headings and @expo-google-fonts/manrope for body text. Load them using expo-font.",
+      "heading_1": { "fontFamily": "Outfit_700Bold", "fontSize": 32, "lineHeight": 40, "letterSpacing": -1 },
+      "heading_2": { "fontFamily": "Outfit_600SemiBold", "fontSize": 24, "lineHeight": 32, "letterSpacing": -0.5 },
+      "heading_3": { "fontFamily": "Outfit_600SemiBold", "fontSize": 18, "lineHeight": 24 },
+      "body": { "fontFamily": "Manrope_400Regular", "fontSize": 16, "lineHeight": 24 },
+      "body_small": { "fontFamily": "Manrope_500Medium", "fontSize": 14, "lineHeight": 20 },
+      "label": { "fontFamily": "Outfit_700Bold", "fontSize": 12, "textTransform": "uppercase", "letterSpacing": 1 }
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48
+    },
+    "border_radius": {
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "pill": 9999
+    }
+  },
+  "components": {
+    "ScreenContainer": {
+      "description": "Main screen wrapper",
+      "style": { "flex": 1, "backgroundColor": "#0F0F0F" }
+    },
+    "Card": {
+      "description": "Base component for challenges, lists",
+      "style": { "backgroundColor": "#1E1E1E", "borderRadius": 16, "padding": 16, "borderWidth": 1, "borderColor": "#27272A", "marginBottom": 16 }
+    },
+    "PublishCenterButton": {
+      "description": "Prominent absolute positioned button for the bottom tab bar.",
+      "implementation": "Use expo-linear-gradient. Colors: ['#007AFF', '#9D4CDD']. Dimensions: width 64, height 64, borderRadius 32. Position: absolute, bottom 24. alignSelf center. Icon: Plus/Camera inside.",
+      "shadow": { "shadowColor": "#007AFF", "shadowOffset": { "width": 0, "height": 4 }, "shadowOpacity": 0.5, "shadowRadius": 12, "elevation": 8 }
+    },
+    "ProgressBar": {
+      "description": "Challenge progress tracker",
+      "container": { "height": 8, "backgroundColor": "#2C2C2E", "borderRadius": 4, "overflow": "hidden" },
+      "fill": { "backgroundColor": "#32D74B", "height": "100%" }
+    },
+    "UserHeader": {
+      "description": "Top section of Home screen",
+      "layout": { "flexDirection": "row", "alignItems": "center", "justifyContent": "space-between", "paddingHorizontal": 24, "paddingTop": 48, "paddingBottom": 16 },
+      "avatar": { "width": 48, "height": 48, "borderRadius": 24, "borderWidth": 2, "borderColor": "#007AFF" }
+    },
+    "Badge": {
+      "description": "Premium gamification badges",
+      "style": { "width": 64, "height": 64, "borderRadius": 32, "backgroundColor": "#1E1E1E", "borderWidth": 2, "borderColor": "#FFD700", "alignItems": "center", "justifyContent": "center" },
+      "shadow": { "shadowColor": "#FFD700", "shadowOpacity": 0.3, "shadowRadius": 8, "elevation": 5 }
+    }
+  },
+  "screens": {
+    "Home": {
+      "priority": "Highest",
+      "structure": [
+        "UserHeader: User info, total points, streak.",
+        "ScrollView: Main content wrapper, paddingBottom 100 to clear absolute tab bar.",
+        "Active Challenges: Vertical list of Cards containing a title, thumbnail, and ProgressBar.",
+        "Trending Challenges: Horizontal ScrollView of Cards.",
+        "Top 3 Leaderboard: Custom View showcasing avatars of top 3 users. Place 1st place higher/larger.",
+        "My Badges: Horizontal list of Badge components."
+      ]
+    },
+    "BottomNavigation": {
+      "description": "Custom bottom tab bar layout",
+      "style": { "backgroundColor": "#121212", "borderTopWidth": 1, "borderTopColor": "#27272A", "height": 80, "paddingBottom": 20, "flexDirection": "row", "justifyContent": "space-around", "alignItems": "center" },
+      "tabs": ["Home", "Challenges", "Publish (Floating)", "Leaderboard", "Profile"]
+    }
+  },
+  "image_urls": {
+    "athlete_working_out": {
+      "url": "https://images.unsplash.com/photo-1770887752071-f03101c81bca?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwxfHxhdGhsZXRlJTIwd29ya2luZyUyMG91dCUyMGRhcmt8ZW58MHx8fHwxNzc2MzQ3NTk4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Category image for 'Sport' or a specific fitness challenge."
+    },
+    "business_meeting": {
+      "url": "https://images.unsplash.com/photo-1758518727707-b023e285b709?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwxfHxidXNpbmVzcyUyMG1lZXRpbmclMjBtb2Rlcm58ZW58MHx8fHwxNzc2MzQ3NTk5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Category image for 'Business' challenges."
+    },
+    "meditation": {
+      "url": "https://images.pexels.com/photos/12276313/pexels-photo-12276313.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Category image for 'Santé' or 'Habitudes' (health/habits) challenges."
+    }
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: This is a React Native Expo app. DO NOT USE HTML OR TAILWIND CSS. Use StyleSheet.create().",
+    "CRITICAL: All interactive elements (TouchableOpacity, TextInput, etc.) MUST have a testID prop in kebab-case.",
+    "Use expo-linear-gradient for the central 'Publish' tab button to create the blue/violet gradient effect requested.",
+    "Implement pure React Native navigation layout. Create a custom bottom tab bar to accommodate the floating central button.",
+    "Maintain the #0F0F0F deep black background and #1E1E1E card colors exactly. Contrast is key for the premium feel."
+  ]
+}
