@@ -743,6 +743,22 @@ async def check_and_award_badges(user_id: str):
 @api_router.post("/seed")
 async def seed_data():
     """Seed initial data for demo purposes"""
+    # Create sample users for leaderboard
+    sample_users = [
+        {"user_id": "seed_user_1", "email": "alex@demo.com", "name": "Alex Martin", "level": 8, "points": 780, "streak": 23, "reputation": 120, "badges": ["first_challenge", "streak_7", "streak_30", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_2", "email": "sarah@demo.com", "name": "Sarah Dubois", "level": 6, "points": 580, "streak": 15, "reputation": 89, "badges": ["first_challenge", "streak_7", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_3", "email": "thomas@demo.com", "name": "Thomas Leroy", "level": 5, "points": 450, "streak": 12, "reputation": 67, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_4", "email": "emma@demo.com", "name": "Emma Bernard", "level": 4, "points": 320, "streak": 9, "reputation": 45, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_5", "email": "lucas@demo.com", "name": "Lucas Petit", "level": 3, "points": 210, "streak": 7, "reputation": 32, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_6", "email": "julie@demo.com", "name": "Julie Moreau", "level": 3, "points": 180, "streak": 5, "reputation": 28, "badges": ["first_challenge", "streak_7"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_7", "email": "hugo@demo.com", "name": "Hugo Lambert", "level": 2, "points": 140, "streak": 4, "reputation": 18, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+        {"user_id": "seed_user_8", "email": "lea@demo.com", "name": "Léa Richard", "level": 2, "points": 95, "streak": 3, "reputation": 12, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc)},
+    ]
+    
+    for u in sample_users:
+        existing = await db.users.find_one({"user_id": u["user_id"]})
+        if not existing:
+            await db.users.insert_one(u)
     # Create sample challenges
     sample_challenges = [
         {
