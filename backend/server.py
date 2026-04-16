@@ -786,6 +786,251 @@ async def get_my_badges(user: User = Depends(get_current_user)):
     """Get current user's badges"""
     return user.badges
 
+# ==================== ADDICTION ENGINE ====================
+
+@api_router.get("/social-pressure")
+async def get_social_pressure(user: User = Depends(get_current_user)):
+    """Generate dynamic social pressure messages for the user"""
+    messages = []
+    
+    # 1. Get user's rank
+    all_users = await db.users.find({}, {"_id": 0}).sort("points", -1).to_list(200)
+    user_rank = next((i + 1 for i, u in enumerate(all_users) if u["user_id"] == user.user_id), len(all_users))
+    total_users = len(all_users)
+    
+    # 2. Find rivals (users just above)
+    rivals_above = []
+    for i, u in enumerate(all_users):
+        if u["user_id"] == user.user_id and i > 0:
+            rivals_above = all_users[max(0, i-2):i]
+            break
+    
+    # 3. Recent proofs from others
+    recent_proofs = await db.proofs.find(
+        {"user_id": {"$ne": user.user_id}},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    # 4. Generate pressure messages
+    if user_rank > 3:
+        if rivals_above:
+            rival = rivals_above[-1]
+            pts_diff = rival.get("points", 0) - user.points
+            messages.append({
+                "type": "rival",
+                "icon": "trending-up",
+                "color": "#FF3B30",
+                "text": f"{rival.get('name', 'Un joueur')} est juste devant toi",
+                "sub": f"Plus que {pts_diff} pts pour le dépasser",
+                "urgency": "high"
+            })
+    
+    if user_rank == 1:
+        messages.append({
+            "type": "leader",
+            "icon": "trophy",
+            "color": "#FFD700",
+            "text": "Tu domines le classement !",
+            "sub": "Reste concentré, ils arrivent",
+            "urgency": "medium"
+        })
+    elif user_rank <= 3:
+        messages.append({
+            "type": "podium",
+            "icon": "podium",
+            "color": "#007AFF",
+            "text": f"Tu es #{user_rank} au classement !",
+            "sub": "Le podium est à portée de main",
+            "urgency": "medium"
+        })
+    else:
+        messages.append({
+            "type": "rank",
+            "icon": "arrow-up",
+            "color": "#FF6B35",
+            "text": f"Tu es #{user_rank} sur {total_users}",
+            "sub": "Valide ton défi pour monter",
+            "urgency": "high"
+        })
+    
+    for p in recent_proofs[:2]:
+        messages.append({
+            "type": "activity",
+            "icon": "flash",
+            "color": "#AF52DE",
+            "text": f"{p.get('user_name', 'Un joueur')} a validé son défi",
+            "sub": p.get("challenge_title", ""),
+            "urgency": "medium"
+        })
+    
+    # Streak pressure
+    if user.streak > 0:
+        messages.append({
+            "type": "streak",
+            "icon": "flame",
+            "color": "#FF6B35",
+            "text": f"Streak de {user.streak} jours !",
+            "sub": "Ne perds pas ta série, valide aujourd'hui",
+            "urgency": "high"
+        })
+    elif user.streak == 0:
+        messages.append({
+            "type": "streak_lost",
+            "icon": "warning",
+            "color": "#FF3B30",
+            "text": "Tu as perdu ton streak !",
+            "sub": "Recommence maintenant, chaque jour compte",
+            "urgency": "critical"
+        })
+    
+    # Active challenges deadline
+    user_challenges = await db.user_challenges.find(
+        {"user_id": user.user_id, "is_completed": False}, {"_id": 0}
+    ).to_list(10)
+    for uc in user_challenges[:1]:
+        ch = await db.challenges.find_one({"challenge_id": uc["challenge_id"]}, {"_id": 0})
+        if ch:
+            days_left = max(0, ch.get("duration_days", 30) - (uc.get("completed_days", 0)))
+            if days_left <= 3:
+                messages.append({
+                    "type": "deadline",
+                    "icon": "alarm",
+                    "color": "#FF3B30",
+                    "text": f"Plus que {days_left} jours !",
+                    "sub": f"Défi \"{ch.get('title', '')}\" se termine bientôt",
+                    "urgency": "critical"
+                })
+    
+    return messages[:6]
+
+@api_router.get("/user-rank")
+async def get_user_rank(user: User = Depends(get_current_user)):
+    """Get user's rank, nearby rivals, and progression data"""
+    all_users = await db.users.find({}, {"_id": 0}).sort("points", -1).to_list(200)
+    
+    user_rank = len(all_users)
+    user_idx = 0
+    for i, u in enumerate(all_users):
+        if u["user_id"] == user.user_id:
+            user_rank = i + 1
+            user_idx = i
+            break
+    
+    total = len(all_users)
+    
+    # Rivals: 2 above and 2 below
+    start = max(0, user_idx - 2)
+    end = min(total, user_idx + 3)
+    nearby = []
+    for i in range(start, end):
+        u = all_users[i]
+        nearby.append({
+            "rank": i + 1,
+            "user_id": u["user_id"],
+            "name": u.get("name", "?"),
+            "picture": u.get("picture"),
+            "points": u.get("points", 0),
+            "is_me": u["user_id"] == user.user_id,
+        })
+    
+    # Points to next rank
+    pts_to_next = 0
+    if user_idx > 0:
+        pts_to_next = all_users[user_idx - 1].get("points", 0) - user.points
+    
+    # Total money in play
+    pot_challenges = await db.challenges.find({"has_pot": True}, {"_id": 0, "pot_total": 1}).to_list(100)
+    total_money = sum(c.get("pot_total", 0) for c in pot_challenges)
+    
+    return {
+        "rank": user_rank,
+        "total_players": total,
+        "points": user.points,
+        "level": user.level,
+        "pts_to_next_rank": pts_to_next,
+        "nearby_rivals": nearby,
+        "total_money_in_play": total_money,
+    }
+
+@api_router.get("/daily-triggers")
+async def get_daily_triggers(user: User = Depends(get_current_user)):
+    """Get personalized triggers / reasons to come back"""
+    triggers = []
+    
+    # Check active challenges that need validation today
+    user_challenges = await db.user_challenges.find(
+        {"user_id": user.user_id, "is_completed": False}, {"_id": 0}
+    ).to_list(20)
+    
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    for uc in user_challenges:
+        ch = await db.challenges.find_one({"challenge_id": uc["challenge_id"]}, {"_id": 0})
+        if not ch:
+            continue
+        
+        # Check if validated today
+        today_proof = await db.proofs.find_one({
+            "user_id": user.user_id,
+            "challenge_id": uc["challenge_id"],
+            "created_at": {"$gte": today_start}
+        })
+        
+        if not today_proof:
+            triggers.append({
+                "type": "validate",
+                "icon": "camera",
+                "color": "#FF3B30",
+                "title": "Valide ton défi !",
+                "text": ch.get("title", ""),
+                "challenge_id": ch.get("challenge_id"),
+                "has_pot": ch.get("has_pot", False),
+                "pot_total": ch.get("pot_total", 0),
+                "urgency": "critical"
+            })
+    
+    if not triggers:
+        triggers.append({
+            "type": "explore",
+            "icon": "compass",
+            "color": "#007AFF",
+            "title": "Explore de nouveaux défis",
+            "text": "Lance-toi dans un nouveau challenge",
+            "urgency": "low"
+        })
+    
+    return triggers
+
+@api_router.get("/money-stats")
+async def get_money_stats(user: User = Depends(get_optional_user)):
+    """Get money stats for home page - total pots, biggest pots etc"""
+    pot_challenges = await db.challenges.find(
+        {"has_pot": True}, {"_id": 0}
+    ).sort("pot_total", -1).to_list(50)
+    
+    total_in_play = sum(c.get("pot_total", 0) for c in pot_challenges)
+    biggest_pot = pot_challenges[0] if pot_challenges else None
+    active_pot_count = len(pot_challenges)
+    
+    # User's money at stake
+    user_money = 0
+    if user:
+        for ch in pot_challenges:
+            if user.user_id in (ch.get("pot_contributions", []) or []):
+                user_money += ch.get("pot_amount_per_person", 0)
+    
+    return {
+        "total_in_play": total_in_play,
+        "active_pot_count": active_pot_count,
+        "biggest_pot": {
+            "challenge_id": biggest_pot.get("challenge_id"),
+            "title": biggest_pot.get("title"),
+            "pot_total": biggest_pot.get("pot_total", 0),
+        } if biggest_pot else None,
+        "user_money_at_stake": user_money,
+        "user_total_earnings": user.total_earnings if user else 0,
+    }
+
 # ==================== HELPER FUNCTIONS ====================
 
 async def update_user_points(user_id: str, points: int):
@@ -867,7 +1112,7 @@ async def seed_data():
         existing = await db.users.find_one({"user_id": u["user_id"]})
         if not existing:
             await db.users.insert_one(u)
-    # Create sample challenges
+    # Create sample challenges - WITH MONEY POTS for addiction
     sample_challenges = [
         {
             "challenge_id": "challenge_sport1",
@@ -878,8 +1123,12 @@ async def seed_data():
             "is_public": True,
             "creator_id": "system",
             "creator_name": "Challenge It",
-            "participants": [],
+            "participants": ["seed_user_1", "seed_user_2", "seed_user_3"],
             "participant_count": 156,
+            "has_pot": True,
+            "pot_amount_per_person": 20,
+            "pot_total": 3120,
+            "pot_contributions": ["seed_user_1", "seed_user_2", "seed_user_3"],
             "image": "https://images.unsplash.com/photo-1603455778956-d71832eafa4e?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
@@ -892,8 +1141,12 @@ async def seed_data():
             "is_public": True,
             "creator_id": "system",
             "creator_name": "Challenge It",
-            "participants": [],
+            "participants": ["seed_user_4"],
             "participant_count": 89,
+            "has_pot": True,
+            "pot_amount_per_person": 10,
+            "pot_total": 890,
+            "pot_contributions": ["seed_user_4"],
             "image": "https://images.unsplash.com/photo-1524863479829-916d8e77f114?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
@@ -906,8 +1159,12 @@ async def seed_data():
             "is_public": True,
             "creator_id": "system",
             "creator_name": "Challenge It",
-            "participants": [],
+            "participants": ["seed_user_1", "seed_user_5"],
             "participant_count": 234,
+            "has_pot": True,
+            "pot_amount_per_person": 50,
+            "pot_total": 11700,
+            "pot_contributions": ["seed_user_1", "seed_user_5"],
             "image": "https://images.unsplash.com/photo-1740210147580-513028fcf04a?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
@@ -922,6 +1179,9 @@ async def seed_data():
             "creator_name": "Challenge It",
             "participants": [],
             "participant_count": 67,
+            "has_pot": False,
+            "pot_amount_per_person": 0,
+            "pot_total": 0,
             "image": "https://images.unsplash.com/photo-1758874384315-995106662187?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         },
@@ -934,8 +1194,12 @@ async def seed_data():
             "is_public": True,
             "creator_id": "system",
             "creator_name": "Challenge It",
-            "participants": [],
+            "participants": ["seed_user_2", "seed_user_6"],
             "participant_count": 178,
+            "has_pot": True,
+            "pot_amount_per_person": 15,
+            "pot_total": 2670,
+            "pot_contributions": ["seed_user_2", "seed_user_6"],
             "image": "https://images.unsplash.com/photo-1648235692910-947cb90ddd97?w=800&h=500&fit=crop&q=80",
             "created_at": datetime.now(timezone.utc)
         }

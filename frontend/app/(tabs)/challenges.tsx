@@ -95,7 +95,16 @@ export default function ChallengesScreen() {
           </View>
           <View>
             <Text style={styles.cardTitle}>{ch.title}</Text>
-            <Text style={styles.cardDesc} numberOfLines={1}>{ch.description}</Text>
+            {ch.has_pot && ch.pot_total > 0 && (
+              <View style={styles.potHighlight}>
+                <Ionicons name="cash" size={16} color="#FFD700" />
+                <Text style={styles.potHighlightText}>{ch.pot_total}€ en jeu</Text>
+                <Text style={styles.potHighlightSub}>Tu peux gagner ou perdre</Text>
+              </View>
+            )}
+            {!ch.has_pot && (
+              <Text style={styles.cardDesc} numberOfLines={1}>{ch.description}</Text>
+            )}
             <View style={styles.cardFooter}>
               <View style={styles.footerLeft}>
                 <Ionicons name="people" size={14} color="rgba(255,255,255,0.6)" />
@@ -230,6 +239,9 @@ const styles = StyleSheet.create({
   durText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
   cardTitle: { fontSize: 22, fontWeight: '900', color: '#FFF', letterSpacing: -0.3, marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   cardDesc: { fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 18, marginBottom: 10 },
+  potHighlight: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' },
+  potHighlightText: { fontSize: 16, fontWeight: '900', color: '#FFD700' },
+  potHighlightSub: { fontSize: 11, fontWeight: '600', color: '#FF3B30' },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.55)' },

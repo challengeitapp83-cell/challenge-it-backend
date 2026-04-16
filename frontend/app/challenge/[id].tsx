@@ -204,6 +204,32 @@ export default function ChallengeDetailScreen() {
                     <Text style={styles.contributedText}>Vous avez contribué</Text>
                   </View>
                 )}
+                {/* MISER BUTTON */}
+                {isJoined && (
+                  <TouchableOpacity
+                    testID="bet-btn"
+                    onPress={() => router.push({
+                      pathname: '/bet/[challengeId]',
+                      params: {
+                        challengeId: id || '',
+                        challengeTitle: challenge.title,
+                        participants: String(challenge.participant_count || 5),
+                      },
+                    })}
+                    activeOpacity={0.8}
+                    style={styles.betBtnWrap}
+                  >
+                    <LinearGradient
+                      colors={['#FFD700', '#FFA500']}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={styles.betBtnInner}
+                    >
+                      <Ionicons name="cash" size={20} color="#000" />
+                      <Text style={styles.betBtnText}>Miser sur ce défi</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#000" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
               </LinearGradient>
             </View>
           </View>
@@ -230,7 +256,7 @@ export default function ChallengeDetailScreen() {
           </View>
         )}
 
-        {/* Join / Publish */}
+        {/* Join / Publish / Bet */}
         {!isJoined ? (
           <TouchableOpacity
             testID="join-challenge-btn"
@@ -256,22 +282,49 @@ export default function ChallengeDetailScreen() {
             </LinearGradient>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            testID="publish-proof-from-detail-btn"
-            onPress={() => router.push('/(tabs)/publish')}
-            activeOpacity={0.8}
-            style={styles.joinWrapper}
-          >
-            <LinearGradient
-              colors={[COLORS.success, '#28B446']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.joinGradient}
+          <View>
+            <TouchableOpacity
+              testID="publish-proof-from-detail-btn"
+              onPress={() => router.push('/(tabs)/publish')}
+              activeOpacity={0.8}
+              style={styles.joinWrapper}
             >
-              <Ionicons name="camera" size={22} color="#FFF" />
-              <Text style={styles.joinText}>Publier une preuve</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={[COLORS.success, '#28B446']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.joinGradient}
+              >
+                <Ionicons name="camera" size={22} color="#FFF" />
+                <Text style={styles.joinText}>Publier une preuve</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            {!challenge.has_pot && (
+              <TouchableOpacity
+                testID="bet-from-detail-btn"
+                onPress={() => router.push({
+                  pathname: '/bet/[challengeId]',
+                  params: {
+                    challengeId: id || '',
+                    challengeTitle: challenge.title,
+                    participants: String(challenge.participant_count || 5),
+                  },
+                })}
+                activeOpacity={0.8}
+                style={[styles.joinWrapper, { marginTop: 10 }]}
+              >
+                <LinearGradient
+                  colors={['#FFD700', '#FFA500']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.joinGradient}
+                >
+                  <Ionicons name="cash" size={22} color="#000" />
+                  <Text style={[styles.joinText, { color: '#000' }]}>Miser sur ce défi</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </ScrollView>
     </View>
@@ -355,6 +408,9 @@ const styles = StyleSheet.create({
   contributeBtnText: { fontSize: 15, fontWeight: '700', color: '#000' },
   contributedBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   contributedText: { fontSize: 13, fontWeight: '600', color: COLORS.success },
+  betBtnWrap: { borderRadius: 12, overflow: 'hidden', marginTop: 10 },
+  betBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, gap: 8 },
+  betBtnText: { fontSize: 16, fontWeight: '800', color: '#000' },
   // Invite
   inviteCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.border },
   inviteLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted, marginBottom: 10 },

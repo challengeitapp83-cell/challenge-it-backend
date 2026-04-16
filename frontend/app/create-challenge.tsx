@@ -1,289 +1,465 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Platform, KeyboardAvoidingView, ActivityIndicator, Share,
+  View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView,
+  Animated, Dimensions, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { api } from '../contexts/api';
-import { COLORS, SPACING, RADIUS, CATEGORIES } from '../contexts/theme';
+import { COLORS } from '../contexts/theme';
 
-const CATEGORY_LIST = ['Sport', 'Business', 'Argent', 'Discipline', 'Santé', 'Social', 'Général'];
-const DURATIONS = [7, 14, 21, 30, 60, 90];
+const { width: W } = Dimensions.get('window');
+
+// ===== DATA =====
+const TYPES = [
+  { id: 'solo', label: 'Solo', desc: 'Affronte-toi toi-même', icon: 'person', grad: ['#007AFF', '#0055CC'] as [string, string] },
+  { id: 'friends', label: 'Entre amis', desc: 'Défie tes proches', icon: 'people', grad: ['#AF52DE', '#7C3AED'] as [string, string] },
+  { id: 'community', label: 'Mondial', desc: 'Affronte le monde entier', icon: 'earth', grad: ['#FF6B35', '#FF2D55'] as [string, string] },
+];
+
+const DURATIONS = [1, 7, 14, 30];
+const PARTICIPANTS = [2, 5, 10, 0]; // 0 = illimité
+
+const CATEGORIES = [
+  { id: 'Sport', icon: 'fitness', color: '#007AFF', emoji: '💪' },
+  { id: 'Esport', icon: 'game-controller', color: '#AF52DE', emoji: '🎮' },
+  { id: 'Business', icon: 'briefcase', color: '#FFD700', emoji: '💼' },
+  { id: 'Art', icon: 'color-palette', color: '#FF2D55', emoji: '🎨' },
+  { id: 'Santé', icon: 'heart', color: '#34C759', emoji: '🧠' },
+  { id: 'Nourriture', icon: 'restaurant', color: '#FF9500', emoji: '🍔' },
+  { id: 'Général', icon: 'star', color: '#5AC8FA', emoji: '🌐' },
+  { id: 'Motivation', icon: 'flash', color: '#FF6B35', emoji: '🚀' },
+];
+
+const STAKES = [
+  { id: 'money', label: 'Argent', desc: 'Mise entre participants', icon: 'cash', color: '#34C759', emoji: '💰' },
+  { id: 'dare', label: 'Gage', desc: 'Punition pour le perdant', icon: 'warning', color: '#FF9500', emoji: '🎯' },
+  { id: 'none', label: 'Rien', desc: 'Défi simple', icon: 'ribbon', color: '#71717A', emoji: '⚪' },
+];
+
 const POT_AMOUNTS = [5, 10, 20, 50, 100];
-const DIFFICULTIES = [
-  { id: 'facile', label: 'Facile', icon: 'sunny', color: COLORS.success },
-  { id: 'moyen', label: 'Moyen', icon: 'flame', color: COLORS.warning },
-  { id: 'hardcore', label: 'Hardcore', icon: 'skull', color: '#FF3B30' },
-];
-const VALIDATIONS = [
-  { id: 'manual', label: 'Manuelle', icon: 'hand-left' },
-  { id: 'photo', label: 'Photo', icon: 'camera' },
-  { id: 'video', label: 'Vidéo', icon: 'videocam' },
-];
+
+// ===== ANIMATION WRAPPER =====
+function Fade({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const o = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(18)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(o, { toValue: 1, duration: 350, delay, useNativeDriver: true }),
+      Animated.timing(y, { toValue: 0, duration: 350, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+  return <Animated.View style={{ opacity: o, transform: [{ translateY: y }] }}>{children}</Animated.View>;
+}
+
+// ===== SCALE ON PRESS =====
+function ScalePress({ children, onPress, testID, style, disabled }: any) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
+  const onOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  return (
+    <TouchableOpacity testID={testID} onPress={onPress} onPressIn={onIn} onPressOut={onOut} activeOpacity={1} disabled={disabled}>
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 export default function CreateChallengeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Sport');
-  const [duration, setDuration] = useState(30);
-  const [challengeType, setChallengeType] = useState<'community' | 'friends'>('community');
-  const [difficulty, setDifficulty] = useState('moyen');
-  const [validationType, setValidationType] = useState('manual');
-  const [hasPot, setHasPot] = useState(false);
+
+  const [step, setStep] = useState(0);
+  const [type, setType] = useState('');
+  const [duration, setDuration] = useState(7);
+  const [maxPart, setMaxPart] = useState(0);
+  const [timeLimited, setTimeLimited] = useState(true);
+  const [category, setCategory] = useState('');
+  const [stake, setStake] = useState('');
   const [potAmount, setPotAmount] = useState(10);
+  const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleCreate = async () => {
-    if (!title.trim()) { Alert.alert('Erreur', 'Le titre est requis'); return; }
-    if (!description.trim()) { Alert.alert('Erreur', 'La description est requise'); return; }
+  // Animated progress
+  const prog = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(prog, { toValue: (step + 1) / 4, useNativeDriver: false, speed: 14 }).start();
+  }, [step]);
+
+  const canNext = () => {
+    if (step === 0) return !!type;
+    if (step === 1) return true;
+    if (step === 2) return !!category && !!stake;
+    if (step === 3) return title.trim().length > 2;
+    return false;
+  };
+
+  const next = () => { if (canNext() && step < 3) setStep(step + 1); };
+  const back = () => { if (step > 0) setStep(step - 1); else router.back(); };
+
+  const submit = async () => {
+    if (!canNext()) return;
     setSubmitting(true);
     try {
-      const challenge = await api.post('/api/challenges', {
+      const ch = await api.post('/api/challenges', {
         title: title.trim(),
-        description: description.trim(),
+        description: `Défi ${category} · ${duration} jours`,
         category,
         duration_days: duration,
-        difficulty,
-        validation_type: validationType,
-        challenge_type: challengeType,
-        has_pot: hasPot,
-        pot_amount_per_person: hasPot ? potAmount : 0,
+        challenge_type: type === 'solo' ? 'community' : type,
+        has_pot: stake === 'money',
+        pot_amount_per_person: stake === 'money' ? potAmount : 0,
+        max_participants: maxPart,
+        difficulty: 'moyen',
+        validation_type: 'photo',
       });
-
-      if (challengeType === 'friends' && challenge.invite_code) {
-        Alert.alert(
-          'Défi créé !',
-          `Code d'invitation : ${challenge.invite_code}\n\nPartagez-le avec vos amis !`,
-          [
-            { text: 'Partager', onPress: () => shareInvite(challenge.invite_code, challenge.title) },
-            { text: 'Voir', onPress: () => router.push(`/challenge/${challenge.challenge_id}`) },
-          ]
-        );
-      } else {
-        Alert.alert('Défi créé !', 'Votre défi est maintenant disponible', [
-          { text: 'Voir', onPress: () => router.push(`/challenge/${challenge.challenge_id}`) },
-        ]);
-      }
-    } catch (e) { Alert.alert('Erreur', 'Impossible de créer le défi'); }
+      Alert.alert('Défi lancé ! 🔥', '', [
+        { text: 'Voir le défi', onPress: () => router.replace(`/challenge/${ch.challenge_id}`) },
+      ]);
+    } catch { Alert.alert('Erreur', 'Impossible de créer le défi'); }
     finally { setSubmitting(false); }
   };
 
-  const shareInvite = async (code: string, challengeTitle: string) => {
-    try {
-      await Share.share({
-        message: `Rejoins mon défi "${challengeTitle}" sur Challenge It !\n\nCode : ${code}`,
-      });
-    } catch {}
-  };
+  // ===== STEP TITLES =====
+  const TITLES = ['Choisis ton mode', 'Configure', 'Personnalise', 'Lance ton défi'];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity testID="back-btn" onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
+      <View style={[g.root, { paddingTop: insets.top }]}>
+
+        {/* ===== HEADER ===== */}
+        <View style={g.hdr}>
+          <TouchableOpacity testID="back-btn" onPress={back} style={g.hdrBtn}>
+            <Ionicons name={step > 0 ? 'arrow-back' : 'close'} size={22} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Créer un défi</Text>
-          <View style={{ width: 44 }} />
+          <View style={g.progW}>
+            <View style={g.progBg}>
+              <Animated.View style={[g.progFill, { width: prog.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}>
+                <LinearGradient colors={['#007AFF', '#AF52DE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              </Animated.View>
+            </View>
+            <Text style={g.stepN}>{step + 1}/4</Text>
+          </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-          {/* ===== TYPE SELECTOR ===== */}
-          <Text style={styles.label}>Type de défi</Text>
-          <View style={styles.typeRow}>
-            <TouchableOpacity testID="type-community" onPress={() => setChallengeType('community')}
-              style={[styles.typeCard, challengeType === 'community' && styles.typeCardActive]}>
-              <View style={[styles.typeIconWrap, { backgroundColor: challengeType === 'community' ? COLORS.primary + '20' : COLORS.card }]}>
-                <Ionicons name="earth" size={24} color={challengeType === 'community' ? COLORS.primary : COLORS.textMuted} />
-              </View>
-              <Text style={[styles.typeName, challengeType === 'community' && { color: COLORS.primary }]}>Communauté</Text>
-              <Text style={styles.typeDesc}>Ouvert à tous</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="type-friends" onPress={() => setChallengeType('friends')}
-              style={[styles.typeCard, challengeType === 'friends' && styles.typeCardFriends]}>
-              <View style={[styles.typeIconWrap, { backgroundColor: challengeType === 'friends' ? COLORS.secondary + '20' : COLORS.card }]}>
-                <Ionicons name="people" size={24} color={challengeType === 'friends' ? COLORS.secondary : COLORS.textMuted} />
-              </View>
-              <Text style={[styles.typeName, challengeType === 'friends' && { color: COLORS.secondary }]}>Entre Amis</Text>
-              <Text style={styles.typeDesc}>Sur invitation</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Title */}
+        <Fade key={`title-${step}`}>
+          <Text style={g.title}>{TITLES[step]}</Text>
+        </Fade>
 
-          {challengeType === 'friends' && (
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle" size={18} color={COLORS.secondary} />
-              <Text style={styles.infoText}>
-                Un code d'invitation sera généré. Partagez-le avec vos amis !
-              </Text>
+        {/* ===== CONTENT ===== */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+          {/* ================== STEP 0: TYPE ================== */}
+          {step === 0 && (
+            <View style={st0.w}>
+              {TYPES.map((t, i) => {
+                const sel = type === t.id;
+                return (
+                  <Fade key={t.id} delay={i * 70}>
+                    <ScalePress testID={`type-${t.id}`} onPress={() => setType(t.id)} style={[st0.card, sel && { borderWidth: 0 }]}>
+                      {sel && <LinearGradient colors={t.grad} style={st0.cardBg} />}
+                      <View style={[st0.iconW, sel && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                        <Ionicons name={t.icon as any} size={30} color={sel ? '#FFF' : t.grad[0]} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[st0.lbl, sel && { color: '#FFF' }]}>{t.label}</Text>
+                        <Text style={[st0.desc, sel && { color: 'rgba(255,255,255,0.7)' }]}>{t.desc}</Text>
+                      </View>
+                      {sel && <Ionicons name="checkmark-circle" size={26} color="#FFF" />}
+                    </ScalePress>
+                  </Fade>
+                );
+              })}
             </View>
           )}
 
-          {/* ===== TITLE ===== */}
-          <Text style={styles.label}>Titre</Text>
-          <TextInput testID="challenge-title-input" style={styles.input} placeholder="Ex : 30 jours de course"
-            placeholderTextColor={COLORS.textMuted} value={title} onChangeText={setTitle} maxLength={60} />
+          {/* ================== STEP 1: CONFIG ================== */}
+          {step === 1 && (
+            <View style={st1.w}>
+              {/* Duration */}
+              <Fade>
+                <Text style={st1.secT}>Durée du défi</Text>
+                <View style={st1.chipRow}>
+                  {DURATIONS.map((d) => {
+                    const sel = duration === d;
+                    return (
+                      <ScalePress key={d} testID={`dur-${d}`} onPress={() => setDuration(d)} style={[st1.durChip, sel && { borderColor: COLORS.primary }]}>
+                        {sel && <LinearGradient colors={['#007AFF', '#5856D6']} style={StyleSheet.absoluteFill} />}
+                        <Text style={[st1.durN, sel && { color: '#FFF' }]}>{d}</Text>
+                        <Text style={[st1.durL, sel && { color: 'rgba(255,255,255,0.7)' }]}>{d === 1 ? 'jour' : 'jours'}</Text>
+                      </ScalePress>
+                    );
+                  })}
+                </View>
+              </Fade>
 
-          {/* ===== DESCRIPTION ===== */}
-          <Text style={styles.label}>Description</Text>
-          <TextInput testID="challenge-description-input" style={[styles.input, styles.textArea]} placeholder="Décrivez le défi..."
-            placeholderTextColor={COLORS.textMuted} value={description} onChangeText={setDescription} multiline maxLength={500} />
-
-          {/* ===== CATEGORY ===== */}
-          <Text style={styles.label}>Catégorie</Text>
-          <View style={styles.chipRow}>
-            {CATEGORY_LIST.map((cat) => {
-              const cfg = CATEGORIES[cat];
-              const active = category === cat;
-              return (
-                <TouchableOpacity key={cat} testID={`cat-${cat}`} onPress={() => setCategory(cat)}
-                  style={[styles.chip, active && { borderColor: cfg.color, backgroundColor: cfg.color + '15' }]}>
-                  <Ionicons name={cfg.icon as any} size={16} color={active ? cfg.color : COLORS.textMuted} />
-                  <Text style={[styles.chipText, active && { color: cfg.color }]}>{cat}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* ===== DURATION ===== */}
-          <Text style={styles.label}>Durée (jours)</Text>
-          <View style={styles.chipRow}>
-            {DURATIONS.map((d) => (
-              <TouchableOpacity key={d} testID={`duration-${d}`} onPress={() => setDuration(d)}
-                style={[styles.durChip, duration === d && styles.durChipActive]}>
-                <Text style={[styles.durText, duration === d && styles.durTextActive]}>{d}j</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ===== CAGNOTTE (POT) ===== */}
-          <Text style={styles.label}>Difficulté</Text>
-          <View style={styles.chipRow}>
-            {DIFFICULTIES.map((d) => (
-              <TouchableOpacity key={d.id} testID={`diff-${d.id}`} onPress={() => setDifficulty(d.id)}
-                style={[styles.chip, difficulty === d.id && { borderColor: d.color, backgroundColor: d.color + '15' }]}>
-                <Ionicons name={d.icon as any} size={16} color={difficulty === d.id ? d.color : COLORS.textMuted} />
-                <Text style={[styles.chipText, difficulty === d.id && { color: d.color }]}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Validation</Text>
-          <View style={styles.chipRow}>
-            {VALIDATIONS.map((v) => (
-              <TouchableOpacity key={v.id} testID={`val-${v.id}`} onPress={() => setValidationType(v.id)}
-                style={[styles.chip, validationType === v.id && { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' }]}>
-                <Ionicons name={v.icon as any} size={16} color={validationType === v.id ? COLORS.primary : COLORS.textMuted} />
-                <Text style={[styles.chipText, validationType === v.id && { color: COLORS.primary }]}>{v.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Cagnotte</Text>
-          <TouchableOpacity testID="toggle-pot" onPress={() => setHasPot(!hasPot)} style={styles.potToggle}>
-            <View style={styles.potToggleLeft}>
-              <Ionicons name="cash" size={22} color={hasPot ? COLORS.warning : COLORS.textMuted} />
-              <View>
-                <Text style={styles.potToggleTitle}>Ajouter une cagnotte</Text>
-                <Text style={styles.potToggleDesc}>Les participants misent un montant</Text>
-              </View>
-            </View>
-            <View style={[styles.toggleSwitch, hasPot && styles.toggleSwitchOn]}>
-              <View style={[styles.toggleDot, hasPot && styles.toggleDotOn]} />
-            </View>
-          </TouchableOpacity>
-
-          {hasPot && (
-            <View style={styles.potSection}>
-              <Text style={styles.potLabel}>Mise par personne</Text>
-              <View style={styles.chipRow}>
-                {POT_AMOUNTS.map((a) => (
-                  <TouchableOpacity key={a} testID={`pot-${a}`} onPress={() => setPotAmount(a)}
-                    style={[styles.potChip, potAmount === a && styles.potChipActive]}>
-                    <Text style={[styles.potChipText, potAmount === a && styles.potChipTextActive]}>{a}€</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={styles.potInfo}>
-                <Ionicons name="trophy" size={16} color={COLORS.warning} />
-                <Text style={styles.potInfoText}>
-                  Le gagnant remporte la cagnotte totale à la fin du défi
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* ===== SUBMIT ===== */}
-          <TouchableOpacity testID="create-challenge-submit-btn" onPress={handleCreate} disabled={submitting}
-            activeOpacity={0.8} style={styles.submitWrap}>
-            <LinearGradient
-              colors={challengeType === 'friends' ? [COLORS.secondary, '#7C3AED'] : ['#007AFF', '#9D4CDD']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitGrad}>
-              {submitting ? <ActivityIndicator color="#FFF" /> : (
-                <>
-                  <Ionicons name={challengeType === 'friends' ? 'people' : 'add-circle'} size={22} color="#FFF" />
-                  <Text style={styles.submitText}>
-                    {challengeType === 'friends' ? 'Créer le défi entre amis' : 'Créer le défi'}
-                  </Text>
-                </>
+              {/* Participants (not solo) */}
+              {type !== 'solo' && (
+                <Fade delay={80}>
+                  <Text style={[st1.secT, { marginTop: 28 }]}>Participants max</Text>
+                  <View style={st1.chipRow}>
+                    {PARTICIPANTS.map((p) => {
+                      const sel = maxPart === p;
+                      const label = p === 0 ? '∞' : `${p}`;
+                      return (
+                        <ScalePress key={p} testID={`part-${p}`} onPress={() => setMaxPart(p)} style={[st1.partChip, sel && { borderColor: COLORS.secondary }]}>
+                          {sel && <LinearGradient colors={['#AF52DE', '#7C3AED']} style={StyleSheet.absoluteFill} />}
+                          <Text style={[st1.partN, sel && { color: '#FFF' }]}>{label}</Text>
+                        </ScalePress>
+                      );
+                    })}
+                  </View>
+                </Fade>
               )}
-            </LinearGradient>
-          </TouchableOpacity>
+
+              {/* Time limited toggle */}
+              <Fade delay={160}>
+                <TouchableOpacity testID="toggle-time" onPress={() => setTimeLimited(!timeLimited)} style={st1.toggleRow} activeOpacity={0.8}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={st1.toggleLbl}>Limité dans le temps</Text>
+                    <Text style={st1.toggleDesc}>Le défi expire après la durée</Text>
+                  </View>
+                  <View style={[st1.toggle, timeLimited && st1.toggleOn]}>
+                    <View style={[st1.toggleDot, timeLimited && st1.toggleDotOn]} />
+                  </View>
+                </TouchableOpacity>
+              </Fade>
+
+              {/* Preview */}
+              <Fade delay={240}>
+                <View style={st1.preview}>
+                  <Ionicons name="information-circle" size={18} color={COLORS.primary} />
+                  <Text style={st1.previewT}>
+                    {duration} jour{duration > 1 ? 's' : ''} · {type === 'solo' ? 'Solo' : maxPart === 0 ? 'Illimité' : `${maxPart} joueurs`}{timeLimited ? '' : ' · Sans limite'}
+                  </Text>
+                </View>
+              </Fade>
+            </View>
+          )}
+
+          {/* ================== STEP 2: CATEGORY + STAKE ================== */}
+          {step === 2 && (
+            <View style={st2.w}>
+              {/* Category grid */}
+              <Fade>
+                <Text style={st1.secT}>Catégorie</Text>
+                <View style={st2.catGrid}>
+                  {CATEGORIES.map((c, i) => {
+                    const sel = category === c.id;
+                    return (
+                      <Fade key={c.id} delay={i * 40}>
+                        <ScalePress testID={`cat-${c.id}`} onPress={() => setCategory(c.id)}
+                          style={[st2.catItem, sel && { borderColor: c.color, backgroundColor: c.color + '15' }]}>
+                          <Text style={st2.catEmoji}>{c.emoji}</Text>
+                          <Text style={[st2.catLbl, sel && { color: c.color }]}>{c.id}</Text>
+                          {sel && <View style={[st2.catDot, { backgroundColor: c.color }]} />}
+                        </ScalePress>
+                      </Fade>
+                    );
+                  })}
+                </View>
+              </Fade>
+
+              {/* Stakes */}
+              <Fade delay={200}>
+                <Text style={[st1.secT, { marginTop: 28 }]}>Enjeu</Text>
+                <View style={st2.stakeCol}>
+                  {STAKES.map((s, i) => {
+                    const sel = stake === s.id;
+                    return (
+                      <Fade key={s.id} delay={220 + i * 60}>
+                        <ScalePress testID={`stake-${s.id}`} onPress={() => setStake(s.id)}
+                          style={[st2.stakeCard, sel && { borderColor: s.color, borderWidth: 2 }]}>
+                          {sel && <View style={[st2.stakeSel, { backgroundColor: s.color + '12' }]} />}
+                          <Text style={st2.stakeEmoji}>{s.emoji}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[st2.stakeLbl, sel && { color: '#FFF' }]}>{s.label}</Text>
+                            <Text style={st2.stakeDesc}>{s.desc}</Text>
+                          </View>
+                          {sel && <Ionicons name="checkmark-circle" size={22} color={s.color} />}
+                        </ScalePress>
+                      </Fade>
+                    );
+                  })}
+                </View>
+              </Fade>
+
+              {/* Pot amounts */}
+              {stake === 'money' && (
+                <Fade delay={400}>
+                  <View style={st2.potW}>
+                    <Text style={st2.potLbl}>Mise par personne</Text>
+                    <View style={st2.potRow}>
+                      {POT_AMOUNTS.map((a) => {
+                        const sel = potAmount === a;
+                        return (
+                          <ScalePress key={a} testID={`pot-${a}`} onPress={() => setPotAmount(a)}
+                            style={[st2.potChip, sel && { borderColor: '#34C759' }]}>
+                            {sel && <LinearGradient colors={['#34C759', '#28A745']} style={StyleSheet.absoluteFill} />}
+                            <Text style={[st2.potChipT, sel && { color: '#FFF' }]}>{a}€</Text>
+                          </ScalePress>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </Fade>
+              )}
+            </View>
+          )}
+
+          {/* ================== STEP 3: TITLE + SUMMARY ================== */}
+          {step === 3 && (
+            <View style={st3.w}>
+              <Fade>
+                <View style={st3.inputW}>
+                  <TextInput testID="challenge-title-input" style={st3.input}
+                    placeholder="Ex : 30 jours sport sans pause"
+                    placeholderTextColor="rgba(255,255,255,0.2)"
+                    value={title} onChangeText={setTitle} maxLength={50} autoFocus />
+                  <Text style={st3.charCnt}>{title.length}/50</Text>
+                </View>
+              </Fade>
+
+              <Fade delay={100}>
+                <View style={st3.summary}>
+                  <Text style={st3.sumTitle}>Récapitulatif</Text>
+                  {[
+                    { icon: TYPES.find(t => t.id === type)?.icon || 'star', color: TYPES.find(t => t.id === type)?.grad[0] || '#FFF', text: TYPES.find(t => t.id === type)?.label || '' },
+                    { icon: 'calendar', color: COLORS.primary, text: `${duration} jour${duration > 1 ? 's' : ''}` },
+                    { icon: type !== 'solo' ? 'people' : 'person', color: COLORS.secondary, text: type === 'solo' ? 'Solo' : maxPart === 0 ? 'Illimité' : `${maxPart} participants` },
+                    { icon: CATEGORIES.find(c => c.id === category)?.icon || 'star', color: CATEGORIES.find(c => c.id === category)?.color || '#FFF', text: category },
+                  ].map((r, i) => (
+                    <View key={i} style={st3.sumRow}>
+                      <View style={[st3.sumIcon, { backgroundColor: (r.color || '#FFF') + '15' }]}>
+                        <Ionicons name={r.icon as any} size={16} color={r.color} />
+                      </View>
+                      <Text style={st3.sumT}>{r.text}</Text>
+                    </View>
+                  ))}
+                  {/* Stake row */}
+                  <View style={st3.sumRow}>
+                    <View style={[st3.sumIcon, { backgroundColor: (STAKES.find(s => s.id === stake)?.color || '#FFF') + '15' }]}>
+                      <Text style={{ fontSize: 16 }}>{STAKES.find(s => s.id === stake)?.emoji}</Text>
+                    </View>
+                    <Text style={st3.sumT}>
+                      {STAKES.find(s => s.id === stake)?.label}{stake === 'money' ? ` · ${potAmount}€/pers` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </Fade>
+            </View>
+          )}
         </ScrollView>
+
+        {/* ===== BOTTOM CTA ===== */}
+        <View style={[g.bot, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {step < 3 ? (
+            <ScalePress testID="next-btn" onPress={next} disabled={!canNext()}
+              style={{}}>
+              <LinearGradient colors={canNext() ? ['#007AFF', '#AF52DE'] : ['#1C1C2E', '#1C1C2E']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={g.cta}>
+                <Text style={[g.ctaT, !canNext() && { color: '#555' }]}>Continuer</Text>
+                <Ionicons name="arrow-forward" size={20} color={canNext() ? '#FFF' : '#555'} />
+              </LinearGradient>
+            </ScalePress>
+          ) : (
+            <ScalePress testID="create-challenge-submit-btn" onPress={submit} disabled={submitting || !canNext()}
+              style={{}}>
+              <LinearGradient colors={canNext() ? ['#007AFF', '#AF52DE'] : ['#1C1C2E', '#1C1C2E']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={g.cta}>
+                {submitting ? <ActivityIndicator color="#FFF" /> : (
+                  <><Ionicons name="rocket" size={22} color="#FFF" /><Text style={g.ctaT}>Lancer le défi</Text></>
+                )}
+              </LinearGradient>
+            </ScalePress>
+          )}
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
-  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-  label: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 20, marginTop: 20, marginBottom: 10 },
-  // Type selector
-  typeRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12 },
-  typeCard: { flex: 1, backgroundColor: COLORS.card, borderRadius: 16, padding: 16, alignItems: 'center', gap: 8, borderWidth: 2, borderColor: COLORS.border },
-  typeCardActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '08' },
-  typeCardFriends: { borderColor: COLORS.secondary, backgroundColor: COLORS.secondary + '08' },
-  typeIconWrap: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
-  typeName: { fontSize: 16, fontWeight: '800', color: '#FFF' },
-  typeDesc: { fontSize: 12, fontWeight: '500', color: COLORS.textMuted },
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 12, backgroundColor: COLORS.secondary + '10', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.secondary + '20' },
-  infoText: { flex: 1, fontSize: 13, fontWeight: '500', color: COLORS.secondary },
-  // Inputs
-  input: { backgroundColor: COLORS.card, borderRadius: 14, padding: 16, marginHorizontal: 20, color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: COLORS.border },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  chipText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  durChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  durChipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' },
-  durText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-  durTextActive: { color: COLORS.primary },
-  // Pot
-  potToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, backgroundColor: COLORS.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: COLORS.border },
-  potToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  potToggleTitle: { fontSize: 15, fontWeight: '700', color: '#FFF' },
-  potToggleDesc: { fontSize: 12, fontWeight: '500', color: COLORS.textMuted },
-  toggleSwitch: { width: 48, height: 28, borderRadius: 14, backgroundColor: '#333', justifyContent: 'center', paddingHorizontal: 3 },
-  toggleSwitchOn: { backgroundColor: COLORS.warning },
-  toggleDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#666' },
+// ===== STYLES =====
+const GL = { backgroundColor: 'rgba(22,22,38,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' };
+
+const g = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0C0C18' },
+  hdr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 14 },
+  hdrBtn: { width: 42, height: 42, borderRadius: 21, ...GL, justifyContent: 'center', alignItems: 'center' },
+  progW: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  progBg: { flex: 1, height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' },
+  progFill: { height: '100%', borderRadius: 3, overflow: 'hidden' },
+  stepN: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.35)' },
+  title: { fontSize: 28, fontWeight: '900', color: '#FFF', letterSpacing: -0.8, paddingHorizontal: 20, marginBottom: 20, marginTop: 4 },
+  bot: { paddingHorizontal: 20, paddingTop: 12 },
+  cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, borderRadius: 16, gap: 10 },
+  ctaT: { fontSize: 17, fontWeight: '800', color: '#FFF' },
+});
+
+// Step 0: Type
+const st0 = StyleSheet.create({
+  w: { gap: 12 },
+  card: { flexDirection: 'row', alignItems: 'center', ...GL, borderRadius: 20, padding: 20, gap: 16, overflow: 'hidden' },
+  cardBg: { ...StyleSheet.absoluteFillObject, borderRadius: 20 },
+  iconW: { width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
+  lbl: { fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
+  desc: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.35)', marginTop: 3 },
+});
+
+// Step 1: Config
+const st1 = StyleSheet.create({
+  w: {},
+  secT: { fontSize: 16, fontWeight: '800', color: 'rgba(255,255,255,0.7)', marginBottom: 14 },
+  chipRow: { flexDirection: 'row', gap: 10 },
+  durChip: { flex: 1, height: 76, borderRadius: 18, ...GL, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  durN: { fontSize: 26, fontWeight: '900', color: 'rgba(255,255,255,0.5)' },
+  durL: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.25)', marginTop: 2 },
+  partChip: { flex: 1, height: 56, borderRadius: 16, ...GL, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  partN: { fontSize: 22, fontWeight: '900', color: 'rgba(255,255,255,0.5)' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', ...GL, borderRadius: 16, padding: 18, marginTop: 28, gap: 14 },
+  toggleLbl: { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  toggleDesc: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  toggle: { width: 50, height: 30, borderRadius: 15, backgroundColor: '#333', justifyContent: 'center', paddingHorizontal: 3 },
+  toggleOn: { backgroundColor: COLORS.primary },
+  toggleDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#666' },
   toggleDotOn: { backgroundColor: '#FFF', alignSelf: 'flex-end' },
-  potSection: { marginHorizontal: 20, marginTop: 12, gap: 12 },
-  potLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
-  potChip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  potChipActive: { borderColor: COLORS.warning, backgroundColor: COLORS.warning + '15' },
-  potChipText: { fontSize: 15, fontWeight: '700', color: COLORS.textSecondary },
-  potChipTextActive: { color: COLORS.warning },
-  potInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.warning + '10', borderRadius: 12, padding: 12 },
-  potInfoText: { flex: 1, fontSize: 13, fontWeight: '500', color: COLORS.warning },
-  // Submit
-  submitWrap: { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', marginTop: 24 },
-  submitGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 18, gap: 10 },
-  submitText: { fontSize: 17, fontWeight: '700', color: '#FFF' },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 10, ...GL, borderRadius: 14, padding: 16, marginTop: 20 },
+  previewT: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
+});
+
+// Step 2: Category + Stake
+const st2 = StyleSheet.create({
+  w: {},
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  catItem: { width: (W - 70) / 4, ...GL, borderRadius: 16, paddingVertical: 16, alignItems: 'center', gap: 6 },
+  catEmoji: { fontSize: 24 },
+  catLbl: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 },
+  catDot: { width: 6, height: 6, borderRadius: 3, marginTop: 2 },
+  stakeCol: { gap: 10 },
+  stakeCard: { flexDirection: 'row', alignItems: 'center', ...GL, borderRadius: 18, padding: 18, gap: 14, overflow: 'hidden' },
+  stakeSel: { ...StyleSheet.absoluteFillObject, borderRadius: 18 },
+  stakeEmoji: { fontSize: 30 },
+  stakeLbl: { fontSize: 16, fontWeight: '800', color: 'rgba(255,255,255,0.75)' },
+  stakeDesc: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.3)', marginTop: 2 },
+  potW: { ...GL, borderRadius: 16, padding: 18, marginTop: 16 },
+  potLbl: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginBottom: 12 },
+  potRow: { flexDirection: 'row', gap: 8 },
+  potChip: { flex: 1, paddingVertical: 14, borderRadius: 14, ...GL, alignItems: 'center', overflow: 'hidden' },
+  potChipT: { fontSize: 16, fontWeight: '800', color: 'rgba(255,255,255,0.4)' },
+});
+
+// Step 3: Title + Summary
+const st3 = StyleSheet.create({
+  w: {},
+  inputW: { ...GL, borderRadius: 20, padding: 20, marginBottom: 20 },
+  input: { fontSize: 22, fontWeight: '700', color: '#FFF', minHeight: 44 },
+  charCnt: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.2)', textAlign: 'right', marginTop: 8 },
+  summary: { ...GL, borderRadius: 20, padding: 20, gap: 14 },
+  sumTitle: { fontSize: 12, fontWeight: '800', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
+  sumRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sumIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  sumT: { fontSize: 15, fontWeight: '600', color: '#FFF' },
 });

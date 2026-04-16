@@ -43,15 +43,18 @@ backend:
 
   - task: "Challenges CRUD endpoints"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/challenges, GET /api/challenges/trending, POST /api/challenges, GET /api/challenges/{id}, POST /api/challenges/{id}/join"
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/challenges returns 7 challenges. GET /api/challenges/trending returns 5 trending challenges with pot data (has_pot, pot_total, pot_amount_per_person fields). All endpoints responding correctly."
 
   - task: "Proofs endpoints"
     implemented: true
@@ -79,15 +82,18 @@ backend:
 
   - task: "Leaderboard endpoint"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/leaderboard"
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - GET /api/leaderboard returns 10 users with correct structure. Endpoint working properly."
 
   - task: "Seed data endpoint"
     implemented: true
@@ -229,7 +235,70 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Full app implemented. Backend has complete API with auth, challenges, proofs, leaderboard. Frontend has all screens with dark premium design. Need to test: 1) Backend APIs work 2) Auth-gated screens load with test session 3) Navigation works 4) Join challenge flow 5) Create challenge flow. Use auth_testing.md for creating test sessions."
+    message: "Major addiction engine update. New backend endpoints added: /api/social-pressure (dynamic social pressure messages), /api/user-rank (user ranking with rivals), /api/daily-triggers (personalized triggers), /api/money-stats (total pots in play). Updated seed data with pot amounts. Frontend home screen completely redesigned with money banner, social pressure feed, ranking widget. Challenge detail now has 'Miser' button linking to bet screen. Test all new endpoints work correctly."
+  - agent: "testing"
+    message: "✅ BACKEND TESTING COMPLETE - All addiction engine endpoints PASSED. /api/money-stats (NO AUTH): Returns 18,400 total in play, 6 active pots, biggest pot 11,700. /api/social-pressure (AUTH): Returns 5 personalized messages with correct structure. /api/user-rank (AUTH): Returns rank 10/17 with 5 nearby rivals. /api/daily-triggers (AUTH): Returns personalized triggers. All endpoints handle auth correctly (401 for invalid tokens). Existing endpoints (/api/challenges, /api/leaderboard) working. Challenges include pot data (has_pot, pot_total, pot_amount_per_person). 100% test success rate (12/12 tests passed)."
+
+backend:
+  - task: "Social pressure endpoint /api/social-pressure"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Returns dynamic social pressure messages with correct structure (type, icon, color, text, sub, urgency). Requires Bearer token auth. Returns 401 for invalid auth as expected. Generated 5 personalized messages including rival tracking, rank status, activity feed, and streak pressure."
+
+  - task: "User rank endpoint /api/user-rank"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Returns user rank data with all required fields (rank, total_players, points, nearby_rivals, total_money_in_play). Auth required. Test user ranked 10/17 with 230 points and 5 nearby rivals. Correctly calculates total money in play from pot challenges."
+
+  - task: "Daily triggers endpoint /api/daily-triggers"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - Returns personalized daily triggers with correct structure (type, icon, color, title, text). Auth required. Returns explore trigger when no active challenges need validation. Properly handles challenge validation status and pot information."
+
+  - task: "Money stats endpoint /api/money-stats"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASSED - NO AUTH required. Returns complete money stats: total_in_play (18,400), active_pot_count (6), biggest_pot details, user_money_at_stake. Correctly aggregates pot data from challenges with has_pot=true. Biggest pot is 'Réveil 5h du Matin' with 11,700 total."
+
+  - task: "Updated seed with pot challenges"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/seed - seeds 5 demo challenges"
 
 #====================================================================================================
 # END - Testing Protocol
