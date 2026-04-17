@@ -2343,3 +2343,4 @@ async def login(request: Request):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
     return {"access_token": token, "user_id": user["user_id"]}
+# force redeploy
