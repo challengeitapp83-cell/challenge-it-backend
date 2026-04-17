@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import httpx
 import base64
+import hashlib
 
 import random
 import string
@@ -2267,6 +2268,35 @@ async def root():
 async def health():
     return {"status": "healthy"}
 
+# Simple auth routes
+
+@api_router.post("/auth/register")
+async def register(request: Request):
+    body = await request.json()
+    email = body.get("email", "")
+    password = body.get("password", "")
+    name = body.get("name", "")
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+    user_id = str(uuid.uuid4())
+    hashed = hashlib.sha256(password.encode()).hexdigest()
+    user = {"user_id": user_id, "email": email, "name": name, "password": hashed, "level": 1, "points": 0, "streak": 0, "reputation": 0, "badges": [], "joined_challenges": [], "challenges_won": 0, "challenges_lost": 0, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "is_suspended": False, "created_at": datetime.now(timezone.utc)}
+    await db.users.insert_one(user)
+    token = hashlib.sha256(f"{user_id}{email}".encode()).hexdigest()
+    return {"access_token": token, "user_id": user_id}
+
+@api_router.post("/auth/login")
+async def login(request: Request):
+    body = await request.json()
+    email = body.get("email", "")
+    password = body.get("password", "")
+    hashed = hashlib.sha256(password.encode()).hexdigest()
+    user = await db.users.find_one({"email": email, "password": hashed})
+    if not user:
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+    token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
+    return {"access_token": token, "user_id": user["user_id"]}
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -2313,35 +2343,6 @@ async def login(request: Request):
     token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
     return {"access_token": token, "user_id": user["user_id"]}
 
-# Simple auth routes
-import hashlib
 
-@api_router.post("/auth/register")
-async def register(request: Request):
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-    name = body.get("name", "")
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
-    user_id = str(uuid.uuid4())
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = {"user_id": user_id, "email": email, "name": name, "password": hashed, "level": 1, "points": 0, "streak": 0, "reputation": 0, "badges": [], "joined_challenges": [], "challenges_won": 0, "challenges_lost": 0, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "is_suspended": False, "created_at": datetime.now(timezone.utc)}
-    await db.users.insert_one(user)
-    token = hashlib.sha256(f"{user_id}{email}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user_id}
-
-@api_router.post("/auth/login")
-async def login(request: Request):
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = await db.users.find_one({"email": email, "password": hashed})
-    if not user:
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user["user_id"]}
 # force redeploy
 # Fri Apr 17 03:46:21 UTC 2026
