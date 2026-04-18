@@ -415,7 +415,8 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
         pot_amount_per_person=challenge_data.pot_amount_per_person,
         platform_commission=challenge_data.pot_amount_per_person * 0.1 if challenge_data.has_pot else 0,
         max_participants=challenge_data.max_participants,
-        image=challenge_data.image
+        image=challenge_data.image,
+proof_required=challenge_data.proof_required
     )
     await db.challenges.insert_one(challenge.dict())
     return challenge.dict()
