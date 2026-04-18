@@ -1068,6 +1068,95 @@ async def get_my_challenges(user: User = Depends(get_current_user)):
     
     return result
 
+# ==================== AI VALIDATION ====================
+
+import anthropic
+import base64
+import httpx
+
+async def validate_proof_with_ai(challenge: dict, proof_data: dict, image_url: str = None) -> dict:
+    """Validate a proof using Claude AI"""
+    try:
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        
+        challenge_title = challenge.get("title", "")
+        challenge_desc = challenge.get("description", "")
+        duration = challenge.get("duration_days", 7)
+        proof_text = proof_data.get("text", "")
+        media_type = proof_data.get("media_type", "text")
+        
+        # Build message content
+        content = []
+        
+        # Add image if available
+        if image_url and media_type in ["image", "video"]:
+            try:
+                async with httpx.AsyncClient() as http_client:
+                    img_response = await http_client.get(image_url, timeout=10.0)
+                    if img_response.status_code == 200:
+                        img_data = base64.standard_b64encode(img_response.content).decode("utf-8")
+                        content.append({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": img_data,
+                            },
+                        })
+            except Exception as e:
+                logger.error(f"Error loading image: {e}")
+        
+        # Add text prompt
+        content.append({
+            "type": "text",
+            "text": f"""Tu es un validateur de défis strict et impartial pour l'application Challenge It.
+
+DÉFI : {challenge_title}
+DESCRIPTION : {challenge_desc}
+DURÉE : {duration} jours
+
+PREUVE SOUMISE :
+- Type : {media_type}
+- Description de l'utilisateur : {proof_text}
+
+Analyse cette preuve et réponds UNIQUEMENT en JSON valide sans markdown :
+{{
+  "is_valid": true ou false,
+  "confidence_score": nombre entre 0 et 100,
+  "reason": "explication courte en français",
+  "flags": ["liste des problèmes détectés"],
+  "ai_generated": true ou false,
+  "conditions_met": ["conditions remplies"],
+  "conditions_failed": ["conditions non remplies"]
+}}
+
+Sois strict : rejette les preuves floues, hors-sujet, générées par IA, ou qui ne correspondent pas au défi."""
+        })
+        
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=500,
+            messages=[{"role": "user", "content": content}]
+        )
+        
+        response_text = message.content[0].text.strip()
+        
+        # Parse JSON response
+        import json
+        result = json.loads(response_text)
+        return result
+        
+    except Exception as e:
+        logger.error(f"AI validation error: {e}")
+        return {
+            "is_valid": True,
+            "confidence_score": 50,
+            "reason": "Validation automatique (erreur IA)",
+            "flags": [],
+            "ai_generated": False,
+            "conditions_met": [],
+            "conditions_failed": []
+        }
 # ==================== PROOF ROUTES ====================
 
 @api_router.post("/proofs")
@@ -1163,6 +1252,27 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     if "image_dupliquee" in flags:
         await _update_trust_score(user.user_id, -10, "duplicate_image")
     
+    # ── Validation IA ──
+        ai_result = await validate_proof_with_ai(
+            challenge,
+            {"text": proof_data.text, "media_type": media_type},
+            proof_data.image
+        )
+        
+        # Ajuste le statut selon l'IA
+        if not is_cash:
+            if ai_result.get("confidence_score", 50) >= 70:
+                initial_status = "accepted"
+            elif ai_result.get("confidence_score", 50) < 30:
+                initial_status = "rejected"
+            else:
+                initial_status = "pending"
+        
+        # Ajoute les flags IA
+        ai_flags = ai_result.get("flags", [])
+        if ai_result.get("ai_generated"):
+            ai_flags.append("ia_generated_proof")
+        flags = list(set(flags + ai_flags))
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
     completed_days = user_challenge["completed_days"] + 1
