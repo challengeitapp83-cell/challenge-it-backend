@@ -467,6 +467,21 @@ async def get_challenge(challenge_id: str):
         raise HTTPException(status_code=404, detail="Challenge not found")
     return challenge
 
+@api_router.delete("/challenges/{challenge_id}")
+async def delete_challenge(challenge_id: str, user: User = Depends(get_current_user)):
+    """Delete a challenge (solo only, creator only)"""
+    challenge = await db.challenges.find_one({"challenge_id": challenge_id})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Défi introuvable")
+    if challenge["creator_id"] != user.user_id:
+        raise HTTPException(status_code=403, detail="Tu n'es pas le créateur de ce défi")
+    if challenge.get("challenge_type") != "solo":
+        raise HTTPException(status_code=400, detail="Seuls les défis Solo peuvent être supprimés")
+    await db.challenges.delete_one({"challenge_id": challenge_id})
+    await db.user_challenges.delete_many({"challenge_id": challenge_id})
+    await db.proofs.delete_many({"challenge_id": challenge_id})
+    return {"message": "Défi supprimé avec succès"}
+
 # ==================== SOCIAL / INVITE ROUTES ====================
 
 @api_router.get("/challenges/code/{invite_code}")
