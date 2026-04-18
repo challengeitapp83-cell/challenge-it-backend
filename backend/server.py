@@ -399,8 +399,8 @@ async def get_leaderboard(limit: int = 10):
 async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends(get_current_user)):
     """Create a new challenge"""
     is_private = challenge_data.is_private if hasattr(challenge_data, 'is_private') else False
-invite_code = generate_invite_code() if is_private or challenge_data.challenge_type == "friends" else None
-is_public = not is_private and challenge_data.challenge_type not in ["friends"]
+    invite_code = generate_invite_code() if is_private or challenge_data.challenge_type == "friends" else None
+    is_public = not is_private and challenge_data.challenge_type not in ["friends"]
     
     challenge = Challenge(
         title=challenge_data.title,
@@ -420,7 +420,7 @@ is_public = not is_private and challenge_data.challenge_type not in ["friends"]
         platform_commission=challenge_data.pot_amount_per_person * 0.1 if challenge_data.has_pot else 0,
         max_participants=challenge_data.max_participants,
         image=challenge_data.image,
-proof_required=challenge_data.proof_required
+        proof_required=challenge_data.proof_required
     )
     await db.challenges.insert_one(challenge.dict())
     return challenge.dict()
