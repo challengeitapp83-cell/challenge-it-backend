@@ -2257,7 +2257,137 @@ async def seed_data():
             await db.challenges.insert_one(challenge)
     
     return {"message": "Data seeded successfully"}
+# ==================== PASSWORD RESET ====================
 
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: Request):
+    body = await request.json()
+    email = body.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email requis")
+    
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        # On ne révèle pas si l'email existe ou non
+        return {"message": "Si cet email existe, un lien a été envoyé"}
+    
+    # Générer token de reset
+    reset_token = hashlib.sha256(f"{user['user_id']}{datetime.now(timezone.utc)}".encode()).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    await db.password_resets.insert_one({
+        "user_id": user["user_id"],
+        "token": reset_token,
+        "expires_at": expires_at,
+        "used": False,
+    })
+    
+    # Envoyer email via SendGrid
+    import sendgrid
+    from sendgrid.helpers.mail import Mail
+    
+    sg = sendgrid.SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
+    message = Mail(
+        from_email="challenge.it.app83@gmail.com",
+        to_emails=email,
+        subject="Réinitialisation de ton mot de passe - Challenge It",
+        html_content=f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A18; color: white; padding: 40px; border-radius: 16px;">
+            <h1 style="color: #7B5CF0;">Challenge It 🚀</h1>
+            <h2>Réinitialisation de ton mot de passe</h2>
+            <p>Tu as demandé à réinitialiser ton mot de passe. Clique sur le bouton ci-dessous :</p>
+            <a href="challengeit://reset-password?token={reset_token}" 
+               style="background: linear-gradient(to right, #4FC3F7, #7B5CF0); color: white; padding: 16px 32px; border-radius: 12px; text-decoration: none; display: inline-block; margin: 20px 0; font-weight: bold;">
+                Réinitialiser mon mot de passe
+            </a>
+            <p style="color: #8B8B9E;">Ce lien expire dans 1 heure.</p>
+            <p style="color: #8B8B9E;">Si tu n'as pas demandé cette réinitialisation, ignore cet email.</p>
+        </div>
+        """
+    )
+    
+    try:
+        sg.send(message)
+    except Exception as e:
+        logger.error(f"SendGrid error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur envoi email")
+    
+    return {"message": "Si cet email existe, un lien a été envoyé"}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: Request):
+    body = await request.json()
+    token = body.get("token", "")
+    new_password = body.get("new_password", "")
+    
+    if not token or not new_password:
+        raise HTTPException(status_code=400, detail="Token et nouveau mot de passe requis")
+    
+    reset = await db.password_resets.find_one({"token": token, "used": False})
+    if not reset:
+        raise HTTPException(status_code=400, detail="Token invalide ou déjà utilisé")
+    
+    expires_at = reset.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token expiré")
+    
+    hashed = hashlib.sha256(new_password.encode()).hexdigest()
+    await db.users.update_one(
+        {"user_id": reset["user_id"]},
+        {"$set": {"password": hashed}}
+    )
+    await db.password_resets.update_one(
+        {"token": token},
+        {"$set": {"used": True}}
+    )
+    
+    return {"message": "Mot de passe réinitialisé avec succès"}
+
+
+@api_router.post("/auth/forgot-identifier")
+async def forgot_identifier(request: Request):
+    body = await request.json()
+    email = body.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email requis")
+    
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        return {"message": "Si cet email existe, ton identifiant a été envoyé"}
+    
+    import sendgrid
+    from sendgrid.helpers.mail import Mail
+    
+    sg = sendgrid.SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
+    message = Mail(
+        from_email="challenge.it.app83@gmail.com",
+        to_emails=email,
+        subject="Ton identifiant Challenge It",
+        html_content=f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A18; color: white; padding: 40px; border-radius: 16px;">
+            <h1 style="color: #7B5CF0;">Challenge It 🚀</h1>
+            <h2>Ton identifiant</h2>
+            <p>Voici ton pseudo sur Challenge It :</p>
+            <div style="background: #1A0A2E; padding: 20px; border-radius: 12px; margin: 20px 0; border: 1px solid #7B5CF0;">
+                <h2 style="color: #4FC3F7; margin: 0;">👤 {user.get('name', '')}</h2>
+            </div>
+            <p style="color: #8B8B9E;">Tu peux te connecter avec ton pseudo ou ton email.</p>
+        </div>
+        """
+    )
+    
+    try:
+        sg.send(message)
+    except Exception as e:
+        logger.error(f"SendGrid error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur envoi email")
+    
+    return {"message": "Si cet email existe, ton identifiant a été envoyé"}
 # ==================== ROOT ====================
 
 @api_router.get("/")
