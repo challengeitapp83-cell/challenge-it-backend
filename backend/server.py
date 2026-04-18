@@ -325,6 +325,43 @@ async def logout(request: Request, response: Response):
     response.delete_cookie(key="session_token", path="/")
     return {"message": "Logged out successfully"}
 
+@api_router.post("/auth/register")
+async def register(request: Request):
+    body = await request.json()
+    email = body.get("email", "")
+    password = body.get("password", "")
+    name = body.get("name", "")
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email deja utilise")
+    user_id = str(uuid.uuid4())
+    hashed = hashlib.sha256(password.encode()).hexdigest()
+    user = {
+        "user_id": user_id, "email": email, "name": name, "password": hashed,
+        "level": 1, "points": 0, "streak": 0, "reputation": 0, "badges": [],
+        "joined_challenges": [], "challenges_won": 0, "challenges_lost": 0,
+        "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100,
+        "trust_level": "fiable", "warnings": 0, "suspensions": 0,
+        "is_suspended": False, "created_at": datetime.now(timezone.utc)
+    }
+    await db.users.insert_one(user)
+    token = hashlib.sha256(f"{user_id}{email}".encode()).hexdigest()
+    return {"access_token": token, "user_id": user_id}
+
+@api_router.post("/auth/login")
+async def login(request: Request):
+    body = await request.json()
+    identifier = body.get("email", "")
+    password = body.get("password", "")
+    hashed = hashlib.sha256(password.encode()).hexdigest()
+    user = await db.users.find_one({"email": identifier, "password": hashed})
+    if not user:
+        user = await db.users.find_one({"name": identifier, "password": hashed})
+    if not user:
+        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
+    token = hashlib.sha256(f"{user['user_id']}{user['email']}".encode()).hexdigest()
+    return {"access_token": token, "user_id": user["user_id"]}
+
 # ==================== USER ROUTES ====================
 
 @api_router.get("/users/me")
@@ -401,8 +438,9 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
     is_private = challenge_data.is_private if hasattr(challenge_data, 'is_private') else False
     invite_code = generate_invite_code() if is_private or challenge_data.challenge_type == "friends" else None
     is_public = not is_private and challenge_data.challenge_type not in ["friends"]
-    
-        challenge = Challenge(
+
+    # FIX: indentation corrigée ici
+    challenge = Challenge(
         title=challenge_data.title,
         description=challenge_data.description,
         category=challenge_data.category,
@@ -817,7 +855,6 @@ async def generate_smart_notifications(user: User = Depends(get_current_user)):
             if has_pot:
                 msg["sub"] = f"{pot_total}€ en jeu — " + msg["sub"]
             
-            # Don't duplicate: check if similar notif exists today
             existing = await db.notifications.find_one({
                 "user_id": user.user_id,
                 "type": "daily_pressure",
@@ -889,6 +926,7 @@ async def generate_smart_notifications(user: User = Depends(get_current_user)):
         above = all_users[user_rank - 2]
         pts_diff = above.get("points", 0) - user.points
         if pts_diff < 50:
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             existing_rank = await db.notifications.find_one({
                 "user_id": user.user_id,
                 "type": "social_ranking",
@@ -1120,14 +1158,14 @@ async def get_my_challenges(user: User = Depends(get_current_user)):
 
 # ==================== AI VALIDATION ====================
 
-import anthropic
+import anthropic as anthropic_sdk
 import base64
 import httpx
 
 async def validate_proof_with_ai(challenge: dict, proof_data: dict, image_url: str = None) -> dict:
     """Validate a proof using Claude AI"""
     try:
-        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        ai_client = anthropic_sdk.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         
         challenge_title = challenge.get("title", "")
         challenge_desc = challenge.get("description", "")
@@ -1183,7 +1221,7 @@ Analyse cette preuve et réponds UNIQUEMENT en JSON valide sans markdown :
 Sois strict : rejette les preuves floues, hors-sujet, générées par IA, ou qui ne correspondent pas au défi."""
         })
         
-        message = client.messages.create(
+        message = ai_client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=500,
             messages=[{"role": "user", "content": content}]
@@ -1207,6 +1245,7 @@ Sois strict : rejette les preuves floues, hors-sujet, générées par IA, ou qui
             "conditions_met": [],
             "conditions_failed": []
         }
+
 # ==================== PROOF ROUTES ====================
 
 @api_router.post("/proofs")
@@ -1302,25 +1341,32 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     if "image_dupliquee" in flags:
         await _update_trust_score(user.user_id, -10, "duplicate_image")
     
-    # ── Validation IA ──
-        ai_result = await validate_proof_with_ai(
-            challenge,
-            {"text": proof_data.text, "media_type": media_type},
-            proof_data.image
-        )
-        
-        # Ajuste le statut selon l'IA
-        if not is_cash:
-            if ai_result.get("is_valid", True):
-                initial_status = "accepted"
-            else:
-                initial_status = "rejected"
-        
-        # Ajoute les flags IA
-        ai_flags = ai_result.get("flags", [])
-        if ai_result.get("ai_generated"):
-            ai_flags.append("ia_generated_proof")
-        flags = list(set(flags + ai_flags))
+    # ── Validation IA ── FIX: indentation corrigée
+    ai_result = await validate_proof_with_ai(
+        challenge,
+        {"text": proof_data.text, "media_type": media_type},
+        proof_data.image
+    )
+    
+    # Ajuste le statut selon l'IA
+    if not is_cash:
+        if ai_result.get("is_valid", True):
+            initial_status = "accepted"
+        else:
+            initial_status = "rejected"
+    
+    # Ajoute les flags IA
+    ai_flags = ai_result.get("flags", [])
+    if ai_result.get("ai_generated"):
+        ai_flags.append("ia_generated_proof")
+    flags = list(set(flags + ai_flags))
+    
+    # Mettre à jour le statut de la preuve selon l'IA
+    await db.proofs.update_one(
+        {"proof_id": proof.proof_id},
+        {"$set": {"status": initial_status, "flags": flags}}
+    )
+    
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
     completed_days = user_challenge["completed_days"] + 1
@@ -1492,7 +1538,6 @@ async def _update_trust_score(user_id: str, delta: int, reason: str = ""):
 
 async def _check_suspicious(user_id: str, challenge_id: str, proof_data: dict) -> List[str]:
     """Check for suspicious behavior, return list of flags"""
-    import hashlib
     flags = []
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     
@@ -1536,7 +1581,6 @@ async def _check_suspicious(user_id: str, challenge_id: str, proof_data: dict) -
 
 def _get_daily_code(challenge_id: str, day: int) -> str:
     """Generate a deterministic daily verification code for a challenge"""
-    import hashlib
     seed = f"challengeit_{challenge_id}_{day}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     h = hashlib.sha256(seed.encode()).hexdigest()[:6].upper()
     return h
@@ -1964,7 +2008,6 @@ async def get_challenge_templates():
 @api_router.get("/recent-gains")
 async def get_recent_gains():
     """Get simulated recent gains for social proof"""
-    import random
     names = ["Alex M.", "Sarah K.", "Thomas L.", "Lea R.", "Hugo B.", "Emma D.", "Lucas P.", "Chloe V.", "Nathan F.", "Jade A."]
     challenges = ["100 Pompes/jour", "7j sans sucre", "Reveil 6h", "1h de focus", "30min course", "Zero tabac", "2L eau/jour", "Meditation 10min"]
     gains_list = []
@@ -2300,23 +2343,22 @@ async def check_and_award_badges(user_id: str):
 @api_router.post("/seed")
 async def seed_data():
     """Seed initial data for demo purposes"""
-    # Create sample users for leaderboard
     sample_users = [
-        {"user_id": "seed_user_1", "email": "alex@demo.com", "name": "Alex Martin", "picture": "https://images.unsplash.com/photo-1769636929231-3cd7f853d038?w=200&h=200&fit=crop&crop=face&q=80", "level": 8, "points": 780, "streak": 23, "reputation": 120, "badges": ["first_challenge", "streak_7", "streak_30", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 12, "challenges_lost": 3, "total_earnings": 340, "friends": ["seed_user_2", "seed_user_3"], "bio": "No pain, no gain."},
-        {"user_id": "seed_user_2", "email": "sarah@demo.com", "name": "Sarah Dubois", "picture": "https://images.unsplash.com/photo-1665224752136-4dbe2dfc8195?w=200&h=200&fit=crop&crop=face&q=80", "level": 6, "points": 580, "streak": 15, "reputation": 89, "badges": ["first_challenge", "streak_7", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 8, "challenges_lost": 2, "total_earnings": 180, "friends": ["seed_user_1"], "bio": "Discipline is freedom."},
-        {"user_id": "seed_user_3", "email": "thomas@demo.com", "name": "Thomas Leroy", "picture": "https://images.unsplash.com/photo-1767175620484-1ed37931a0d1?w=200&h=200&fit=crop&crop=face&q=80", "level": 5, "points": 450, "streak": 12, "reputation": 67, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 5, "challenges_lost": 4, "total_earnings": 90, "friends": ["seed_user_1"], "bio": ""},
-        {"user_id": "seed_user_4", "email": "emma@demo.com", "name": "Emma Bernard", "picture": "https://images.unsplash.com/photo-1610721193651-e6aca85b45aa?w=200&h=200&fit=crop&crop=face&q=80", "level": 4, "points": 320, "streak": 9, "reputation": 45, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 3, "challenges_lost": 2, "total_earnings": 50, "friends": [], "bio": ""},
-        {"user_id": "seed_user_5", "email": "lucas@demo.com", "name": "Lucas Petit", "picture": "https://images.unsplash.com/photo-1758534063829-a72058381e21?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 210, "streak": 7, "reputation": 32, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 2, "challenges_lost": 3, "total_earnings": 20, "friends": [], "bio": ""},
-        {"user_id": "seed_user_6", "email": "julie@demo.com", "name": "Julie Moreau", "picture": "https://images.unsplash.com/photo-1544334599-eba0d8934b6f?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 180, "streak": 5, "reputation": 28, "badges": ["first_challenge", "streak_7"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 2, "total_earnings": 0, "friends": [], "bio": ""},
-        {"user_id": "seed_user_7", "email": "hugo@demo.com", "name": "Hugo Lambert", "picture": "https://images.unsplash.com/photo-1764545973653-94c40d993495?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 140, "streak": 4, "reputation": 18, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": ""},
-        {"user_id": "seed_user_8", "email": "lea@demo.com", "name": "Léa Richard", "picture": "https://images.unsplash.com/photo-1771072428365-f0f97d0d25b7?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 95, "streak": 3, "reputation": 12, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 0, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": ""},
+        {"user_id": "seed_user_1", "email": "alex@demo.com", "name": "Alex Martin", "picture": "https://images.unsplash.com/photo-1769636929231-3cd7f853d038?w=200&h=200&fit=crop&crop=face&q=80", "level": 8, "points": 780, "streak": 23, "reputation": 120, "badges": ["first_challenge", "streak_7", "streak_30", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 12, "challenges_lost": 3, "total_earnings": 340, "friends": ["seed_user_2", "seed_user_3"], "bio": "No pain, no gain.", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_2", "email": "sarah@demo.com", "name": "Sarah Dubois", "picture": "https://images.unsplash.com/photo-1665224752136-4dbe2dfc8195?w=200&h=200&fit=crop&crop=face&q=80", "level": 6, "points": 580, "streak": 15, "reputation": 89, "badges": ["first_challenge", "streak_7", "points_100", "points_500"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 8, "challenges_lost": 2, "total_earnings": 180, "friends": ["seed_user_1"], "bio": "Discipline is freedom.", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_3", "email": "thomas@demo.com", "name": "Thomas Leroy", "picture": "https://images.unsplash.com/photo-1767175620484-1ed37931a0d1?w=200&h=200&fit=crop&crop=face&q=80", "level": 5, "points": 450, "streak": 12, "reputation": 67, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 5, "challenges_lost": 4, "total_earnings": 90, "friends": ["seed_user_1"], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_4", "email": "emma@demo.com", "name": "Emma Bernard", "picture": "https://images.unsplash.com/photo-1610721193651-e6aca85b45aa?w=200&h=200&fit=crop&crop=face&q=80", "level": 4, "points": 320, "streak": 9, "reputation": 45, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 3, "challenges_lost": 2, "total_earnings": 50, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_5", "email": "lucas@demo.com", "name": "Lucas Petit", "picture": "https://images.unsplash.com/photo-1758534063829-a72058381e21?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 210, "streak": 7, "reputation": 32, "badges": ["first_challenge", "streak_7", "points_100"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 2, "challenges_lost": 3, "total_earnings": 20, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_6", "email": "julie@demo.com", "name": "Julie Moreau", "picture": "https://images.unsplash.com/photo-1544334599-eba0d8934b6f?w=200&h=200&fit=crop&crop=face&q=80", "level": 3, "points": 180, "streak": 5, "reputation": 28, "badges": ["first_challenge", "streak_7"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 2, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_7", "email": "hugo@demo.com", "name": "Hugo Lambert", "picture": "https://images.unsplash.com/photo-1764545973653-94c40d993495?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 140, "streak": 4, "reputation": 18, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 1, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
+        {"user_id": "seed_user_8", "email": "lea@demo.com", "name": "Léa Richard", "picture": "https://images.unsplash.com/photo-1771072428365-f0f97d0d25b7?w=200&h=200&fit=crop&crop=face&q=80", "level": 2, "points": 95, "streak": 3, "reputation": 12, "badges": ["first_challenge"], "joined_challenges": [], "created_at": datetime.now(timezone.utc), "challenges_won": 0, "challenges_lost": 1, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "suspensions": 0, "is_suspended": False},
     ]
     
     for u in sample_users:
         existing = await db.users.find_one({"user_id": u["user_id"]})
         if not existing:
             await db.users.insert_one(u)
-    # Create sample challenges - WITH MONEY POTS for addiction
+
     sample_challenges = [
         {
             "challenge_id": "challenge_sport1",
@@ -2415,6 +2457,7 @@ async def seed_data():
             await db.challenges.insert_one(challenge)
     
     return {"message": "Data seeded successfully"}
+
 # ==================== PASSWORD RESET ====================
 
 @api_router.post("/auth/forgot-password")
@@ -2426,7 +2469,6 @@ async def forgot_password(request: Request):
     
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user:
-        # On ne révèle pas si l'email existe ou non
         return {"message": "Si cet email existe, un lien a été envoyé"}
     
     # Générer token de reset
@@ -2440,7 +2482,6 @@ async def forgot_password(request: Request):
         "used": False,
     })
     
-    # Envoyer email via SendGrid
     import sendgrid
     from sendgrid.helpers.mail import Mail
     
@@ -2546,6 +2587,7 @@ async def forgot_identifier(request: Request):
         raise HTTPException(status_code=500, detail="Erreur envoi email")
     
     return {"message": "Si cet email existe, ton identifiant a été envoyé"}
+
 # ==================== ROOT ====================
 
 @api_router.get("/")
@@ -2556,37 +2598,6 @@ async def root():
 async def health():
     return {"status": "healthy"}
 
-# Simple auth routes
-
-@api_router.post("/auth/register")
-async def register(request: Request):
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-    name = body.get("name", "")
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
-    user_id = str(uuid.uuid4())
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = {"user_id": user_id, "email": email, "name": name, "password": hashed, "level": 1, "points": 0, "streak": 0, "reputation": 0, "badges": [], "joined_challenges": [], "challenges_won": 0, "challenges_lost": 0, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "is_suspended": False, "created_at": datetime.now(timezone.utc)}
-    await db.users.insert_one(user)
-    token = hashlib.sha256(f"{user_id}{email}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user_id}
-
-@api_router.post("/auth/login")
-async def login(request: Request):
-    body = await request.json()
-    identifier = body.get("email", "")
-    password = body.get("password", "")
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = await db.users.find_one({"email": identifier, "password": hashed})
-    if not user:
-        user = await db.users.find_one({"name": identifier, "password": hashed})
-    if not user:
-        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
-    token = hashlib.sha256(f"{user['user_id']}{user['email']}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user["user_id"]}
 # Include the router in the main app
 app.include_router(api_router)
 
@@ -2601,40 +2612,3 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-
-# Simple auth routes
-import hashlib
-
-@api_router.post("/auth/register")
-async def register(request: Request):
-    body = await request.json()
-    email = body.get("email", "")
-    password = body.get("password", "")
-    name = body.get("name", "")
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
-    user_id = str(uuid.uuid4())
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = {"user_id": user_id, "email": email, "name": name, "password": hashed, "level": 1, "points": 0, "streak": 0, "reputation": 0, "badges": [], "joined_challenges": [], "challenges_won": 0, "challenges_lost": 0, "total_earnings": 0, "friends": [], "bio": "", "trust_score": 100, "trust_level": "fiable", "warnings": 0, "is_suspended": False, "created_at": datetime.now(timezone.utc)}
-    await db.users.insert_one(user)
-    token = hashlib.sha256(f"{user_id}{email}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user_id}
-
-@api_router.post("/auth/login")
-async def login(request: Request):
-    body = await request.json()
-    identifier = body.get("email", "")
-    password = body.get("password", "")
-    hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = await db.users.find_one({"email": identifier, "password": hashed})
-    if not user:
-        user = await db.users.find_one({"name": identifier, "password": hashed})
-    if not user:
-        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
-    token = hashlib.sha256(f"{user['user_id']}{user['email']}".encode()).hexdigest()
-    return {"access_token": token, "user_id": user["user_id"]}
-
-
-# force redeploy
-# Fri Apr 17 03:46:21 UTC 2026
