@@ -120,6 +120,7 @@ class ChallengeCreate(BaseModel):
     image: Optional[str] = None
     proof_required: str = "photo"
     is_unlimited: bool = False
+    is_private: bool = False
 
 class UserChallenge(BaseModel):
     user_challenge_id: str = Field(default_factory=lambda: f"uc_{uuid.uuid4().hex[:12]}")
@@ -397,8 +398,9 @@ async def get_leaderboard(limit: int = 10):
 @api_router.post("/challenges")
 async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends(get_current_user)):
     """Create a new challenge"""
-    invite_code = generate_invite_code() if challenge_data.challenge_type == "friends" else None
-    is_public = challenge_data.challenge_type == "community"
+    is_private = challenge_data.is_private if hasattr(challenge_data, 'is_private') else False
+invite_code = generate_invite_code() if is_private or challenge_data.challenge_type == "friends" else None
+is_public = not is_private and challenge_data.challenge_type not in ["friends"]
     
     challenge = Challenge(
         title=challenge_data.title,
