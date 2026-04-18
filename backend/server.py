@@ -118,8 +118,8 @@ class ChallengeCreate(BaseModel):
     pot_amount_per_person: float = 0
     max_participants: int = 0
     image: Optional[str] = None
-proof_required: str = "photo"
-is_unlimited: bool = False
+    proof_required: str = "photo"
+    is_unlimited: bool = False
 
 class UserChallenge(BaseModel):
     user_challenge_id: str = Field(default_factory=lambda: f"uc_{uuid.uuid4().hex[:12]}")
