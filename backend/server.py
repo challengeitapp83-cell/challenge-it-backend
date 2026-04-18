@@ -191,6 +191,17 @@ async def get_current_user(request: Request) -> User:
     if not session_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
+    # ── Essai token custom (hash sha256) ──
+    user = await db.users.find_one({"_id": {"$exists": True}})
+    # Cherche l'utilisateur dont le token correspond
+    import hashlib
+    all_users = await db.users.find({}, {"_id": 0}).to_list(1000)
+    for u in all_users:
+        expected_token = hashlib.sha256(f"{u['user_id']}{u['email']}".encode()).hexdigest()
+        if expected_token == session_token:
+            return User(**u)
+    
+    # ── Essai session Emergent Auth ──
     session = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
