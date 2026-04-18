@@ -421,12 +421,31 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
     return challenge.dict()
 
 @api_router.get("/challenges")
-async def get_challenges(category: Optional[str] = None, limit: int = 20):
-    """Get public challenges"""
-    query = {"is_public": True}
+async def get_challenges(category: Optional[str] = None, limit: int = 20, request: Request = None):
+    """Get public challenges + user's own challenges"""
+    # Récupère l'utilisateur connecté si possible
+    current_user = None
+    try:
+        if request:
+            current_user = await get_current_user(request)
+    except:
+        pass
+
+    # Construire la query
+    if current_user:
+        query = {
+            "$or": [
+                {"is_public": True},
+                {"creator_id": current_user.user_id},
+                {"participants": current_user.user_id},
+            ]
+        }
+    else:
+        query = {"is_public": True}
+
     if category:
         query["category"] = category
-    
+
     challenges = await db.challenges.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     return challenges
 
