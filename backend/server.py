@@ -2289,13 +2289,15 @@ async def register(request: Request):
 @api_router.post("/auth/login")
 async def login(request: Request):
     body = await request.json()
-    email = body.get("email", "")
+    identifier = body.get("email", "")
     password = body.get("password", "")
     hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = await db.users.find_one({"email": email, "password": hashed})
+    user = await db.users.find_one({"email": identifier, "password": hashed})
     if not user:
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
+        user = await db.users.find_one({"name": identifier, "password": hashed})
+    if not user:
+        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
+    token = hashlib.sha256(f"{user['user_id']}{user['email']}".encode()).hexdigest()
     return {"access_token": token, "user_id": user["user_id"]}
 # Include the router in the main app
 app.include_router(api_router)
@@ -2334,13 +2336,15 @@ async def register(request: Request):
 @api_router.post("/auth/login")
 async def login(request: Request):
     body = await request.json()
-    email = body.get("email", "")
+    identifier = body.get("email", "")
     password = body.get("password", "")
     hashed = hashlib.sha256(password.encode()).hexdigest()
-    user = await db.users.find_one({"email": email, "password": hashed})
+    user = await db.users.find_one({"email": identifier, "password": hashed})
     if not user:
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    token = hashlib.sha256(f"{user['user_id']}{email}".encode()).hexdigest()
+        user = await db.users.find_one({"name": identifier, "password": hashed})
+    if not user:
+        raise HTTPException(status_code=401, detail="Identifiant ou mot de passe incorrect")
+    token = hashlib.sha256(f"{user['user_id']}{user['email']}".encode()).hexdigest()
     return {"access_token": token, "user_id": user["user_id"]}
 
 
