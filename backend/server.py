@@ -402,7 +402,7 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
     invite_code = generate_invite_code() if is_private or challenge_data.challenge_type == "friends" else None
     is_public = not is_private and challenge_data.challenge_type not in ["friends"]
     
-    challenge = Challenge(
+        challenge = Challenge(
         title=challenge_data.title,
         description=challenge_data.description,
         category=challenge_data.category,
