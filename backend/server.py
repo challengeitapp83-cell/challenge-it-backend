@@ -1261,12 +1261,10 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
         
         # Ajuste le statut selon l'IA
         if not is_cash:
-            if ai_result.get("confidence_score", 50) >= 70:
+            if ai_result.get("is_valid", True):
                 initial_status = "accepted"
-            elif ai_result.get("confidence_score", 50) < 30:
-                initial_status = "rejected"
             else:
-                initial_status = "pending"
+                initial_status = "rejected"
         
         # Ajoute les flags IA
         ai_flags = ai_result.get("flags", [])
