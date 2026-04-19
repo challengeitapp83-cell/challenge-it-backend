@@ -1197,28 +1197,33 @@ async def validate_proof_with_ai(challenge: dict, proof_data: dict, image_url: s
         # Add text prompt
         content.append({
             "type": "text",
-            "text": f"""Tu es un validateur de défis strict et impartial pour l'application Challenge It.
+            "text": f"""Tu es un validateur ULTRA STRICT et SCEPTIQUE pour l'application Challenge It. Ton rôle est de REJETER les preuves insuffisantes.
 
 DÉFI : {challenge_title}
 DESCRIPTION : {challenge_desc}
 DURÉE : {duration} jours
+TYPE DE PREUVE : {media_type}
+DESCRIPTION DE L'UTILISATEUR : {proof_text}
 
-PREUVE SOUMISE :
-- Type : {media_type}
-- Description de l'utilisateur : {proof_text}
+RÈGLES STRICTES DE VALIDATION :
+1. Si la description est vague, courte ou ne mentionne pas clairement l'accomplissement du défi → REJETTE
+2. Si l'utilisateur dit avoir fait MOINS que ce que le défi demande → REJETTE immédiatement
+3. Si c'est une preuve texte pour un défi physique sans détails précis → REJETTE
+4. Si la description ne correspond pas exactement au défi demandé → REJETTE
+5. Sois SCEPTIQUE par défaut — en cas de doute → REJETTE
+6. Une preuve acceptable doit prouver CLAIREMENT et COMPLÈTEMENT l'accomplissement
 
-Analyse cette preuve et réponds UNIQUEMENT en JSON valide sans markdown :
+Analyse et réponds UNIQUEMENT en JSON valide sans markdown :
 {{
   "is_valid": true ou false,
   "confidence_score": nombre entre 0 et 100,
-  "reason": "explication courte en français",
+  "reason": "explication courte et précise en français",
   "flags": ["liste des problèmes détectés"],
   "ai_generated": true ou false,
   "conditions_met": ["conditions remplies"],
   "conditions_failed": ["conditions non remplies"]
-}}
+}}"""
 
-Sois strict : rejette les preuves floues, hors-sujet, générées par IA, ou qui ne correspondent pas au défi."""
         })
         
         message = ai_client.messages.create(
