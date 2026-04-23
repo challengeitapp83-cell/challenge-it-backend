@@ -103,6 +103,9 @@ class Challenge(BaseModel):
     is_frozen: bool = False  # frozen if dispute active on cash challenge
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     image: Optional[str] = None
+    winner_mode: str = "all"  # all, first, endurance
+    is_finished: bool = False
+    finished_at: Optional[datetime] = None
 
 class ChallengeCreate(BaseModel):
     title: str
@@ -121,6 +124,7 @@ class ChallengeCreate(BaseModel):
     proof_required: str = "photo"
     is_unlimited: bool = False
     is_private: bool = False
+    winner_mode: str = "all"
 
 class UserChallenge(BaseModel):
     user_challenge_id: str = Field(default_factory=lambda: f"uc_{uuid.uuid4().hex[:12]}")
@@ -459,6 +463,8 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
         max_participants=challenge_data.max_participants,
         image=challenge_data.image,
         proof_required=challenge_data.proof_required
+        winner_mode=challenge_data.winner_mode,
+        is_finished=False,
     )
     await db.challenges.insert_one(challenge.dict())
     return challenge.dict()
@@ -481,6 +487,7 @@ async def get_challenges(category: Optional[str] = None, limit: int = 20, reques
                 {"is_public": True},
                 {"creator_id": current_user.user_id},
                 {"participants": current_user.user_id},
+            "is_finished": {"$ne": True}
             ]
         }
     else:
@@ -1175,6 +1182,25 @@ async def get_my_challenges(user: User = Depends(get_current_user)):
     
     return result
 
+@api_router.get("/my-challenges/finished")
+async def get_finished_challenges(user: User = Depends(get_current_user)):
+    """Get user's finished challenges"""
+    user_challenges = await db.user_challenges.find(
+        {"user_id": user.user_id},
+        {"_id": 0}
+    ).to_list(100)
+    
+    result = []
+    for uc in user_challenges:
+        challenge = await db.challenges.find_one(
+            {"challenge_id": uc["challenge_id"], "is_finished": True},
+            {"_id": 0}
+        )
+        if challenge:
+            result.append({**uc, "challenge": challenge})
+    
+    return result
+
 # ==================== AI VALIDATION ====================
 
 import anthropic as anthropic_sdk
@@ -1390,6 +1416,25 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
         {"proof_id": proof.proof_id},
         {"$set": {"status": initial_status, "flags": flags}}
     )
+        
+    # ── MODE FIRST : premier arrivé gagne ──
+        winner_mode = challenge.get("winner_mode", "all")
+        if winner_mode == "first" and initial_status == "accepted":
+            await db.challenges.update_one(
+                {"challenge_id": proof_data.challenge_id},
+                {"$set": {
+                    "is_finished": True,
+                    "finished_at": datetime.now(timezone.utc),
+                    "winner_id": user.user_id,
+                    "winner_name": user.name,
+                }}
+            )
+            ch_participants = challenge.get("participants", [])
+            for p_id in ch_participants:
+                if p_id != user.user_id:
+                    await _create_notification(
+                        p_id,
+                        "challenge_finished",
     
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
