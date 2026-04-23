@@ -487,8 +487,8 @@ async def get_challenges(category: Optional[str] = None, limit: int = 20, reques
                 {"is_public": True},
                 {"creator_id": current_user.user_id},
                 {"participants": current_user.user_id},
+            ],
             "is_finished": {"$ne": True}
-            ]
         }
     else:
         query = {"is_public": True}
