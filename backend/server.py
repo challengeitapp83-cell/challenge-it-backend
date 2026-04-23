@@ -462,7 +462,7 @@ async def create_challenge(challenge_data: ChallengeCreate, user: User = Depends
         platform_commission=challenge_data.pot_amount_per_person * 0.1 if challenge_data.has_pot else 0,
         max_participants=challenge_data.max_participants,
         image=challenge_data.image,
-        proof_required=challenge_data.proof_required
+        proof_required=challenge_data.proof_required,
         winner_mode=challenge_data.winner_mode,
         is_finished=False,
     )
