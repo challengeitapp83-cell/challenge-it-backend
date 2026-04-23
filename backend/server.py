@@ -1023,6 +1023,25 @@ async def update_bio(request: Request, user: User = Depends(get_current_user)):
     await db.users.update_one({"user_id": user.user_id}, {"$set": {"bio": bio}})
     return {"message": "Bio mise à jour"}
 
+@api_router.put("/users/me")
+async def update_profile(request: Request, user: User = Depends(get_current_user)):
+    """Update user profile (name, bio, picture, etc.)"""
+    body = await request.json()
+    
+    allowed_fields = ["name", "bio", "picture"]
+    update_data = {k: v for k, v in body.items() if k in allowed_fields}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+    
+    await db.users.update_one(
+        {"user_id": user.user_id},
+        {"$set": update_data}
+    )
+    
+    updated_user = await db.users.find_one({"user_id": user.user_id}, {"_id": 0})
+    return updated_user
+
 @api_router.get("/users/me/stats")
 async def get_my_stats(user: User = Depends(get_current_user)):
     """Get detailed user stats"""
