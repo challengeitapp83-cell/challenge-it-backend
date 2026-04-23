@@ -1415,7 +1415,7 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
     await db.proofs.update_one(
         {"proof_id": proof.proof_id},
         {"$set": {"status": initial_status, "flags": flags}}
-    ) 
+    )
 
     # ── MODE FIRST : premier arrivé gagne ──
     winner_mode = challenge.get("winner_mode", "all")
@@ -1444,23 +1444,9 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
                 f"Tu as gagné le défi \"{challenge.get('title')}\" ! 🏆",
                 {"challenge_id": proof_data.challenge_id, "icon": "trophy", "color": "#FFD700"}
             )
-    
+
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
-    completed_days = user_challenge["completed_days"] + 1
-    is_completed = completed_days >= challenge["duration_days"]
-    
-    await db.user_challenges.update_one(
-        {"user_challenge_id": user_challenge["user_challenge_id"]},
-        {
-            "$set": {
-                "current_day": new_day,
-                "completed_days": completed_days,
-                "is_completed": is_completed
-            },
-            "$push": {"proofs": proof.proof_id}
-        }
-    )
     
     # Update user points and streak
     await update_user_points(user.user_id, 10)
