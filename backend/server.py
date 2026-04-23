@@ -1429,21 +1429,21 @@ async def create_proof(proof_data: ProofCreate, user: User = Depends(get_current
                 "winner_name": user.name,
             }}
         )
-            ch_participants = challenge.get("participants", [])
-            for p_id in ch_participants:
-                if p_id != user.user_id:
-                    await _create_notification(
-                        p_id,
-                        "challenge_finished",
-                        f"{user.name} a gagné le défi \"{challenge.get('title')}\" !",
-                        {"challenge_id": proof_data.challenge_id, "icon": "trophy", "color": "#FFD700"}
-                    )
-            await _create_notification(
-                user.user_id,
-                "challenge_win",
-                f"Tu as gagné le défi \"{challenge.get('title')}\" ! 🏆",
-                {"challenge_id": proof_data.challenge_id, "icon": "trophy", "color": "#FFD700"}
-            )
+        ch_participants = challenge.get("participants", [])
+        for p_id in ch_participants:
+            if p_id != user.user_id:
+                await _create_notification(
+                    p_id,
+                    "challenge_finished",
+                    f"{user.name} a gagné le défi \"{challenge.get('title')}\" !",
+                    {"challenge_id": proof_data.challenge_id, "icon": "trophy", "color": "#FFD700"}
+                )
+        await _create_notification(
+            user.user_id,
+            "challenge_win",
+            f"Tu as gagné le défi \"{challenge.get('title')}\" ! 🏆",
+            {"challenge_id": proof_data.challenge_id, "icon": "trophy", "color": "#FFD700"}
+        )
 
     # Update user challenge progress
     new_day = user_challenge["current_day"] + 1
